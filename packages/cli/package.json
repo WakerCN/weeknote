@@ -1,0 +1,32 @@
+{
+  "name": "@weeknote/cli",
+  "version": "1.0.0",
+  "description": "CLI tool for Weekly Report Optimizer",
+  "type": "module",
+  "bin": {
+    "weeknote": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "lint": "eslint src/",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@weeknote/core": "workspace:*",
+    "chalk": "^5.3.0",
+    "clipboardy": "^4.0.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.0",
+    "inquirer": "^9",
+    "ora": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.9",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  },
+  "files": [
+    "dist"
+  ]
+}
