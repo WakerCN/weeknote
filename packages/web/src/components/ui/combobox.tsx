@@ -33,10 +33,16 @@ const PopoverContent = React.forwardRef<
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;
 
 // ============ Combobox 组合组件 ============
+export interface ComboboxTag {
+  text: string;
+  variant: 'success' | 'warning' | 'info' | 'default';
+}
+
 export interface ComboboxOption {
   value: string;
   label: string;
   icon?: React.ReactNode;
+  tags?: ComboboxTag[];
 }
 
 interface ComboboxProps {
@@ -96,6 +102,21 @@ export function Combobox({
     }
   };
 
+  // 获取标签样式
+  const getTagClassName = (variant: ComboboxTag['variant']) => {
+    const base = 'text-xs px-1.5 py-0.5 rounded';
+    switch (variant) {
+      case 'success':
+        return `${base} bg-emerald-400/10 text-emerald-400`;
+      case 'warning':
+        return `${base} bg-yellow-400/10 text-yellow-400`;
+      case 'info':
+        return `${base} bg-blue-400/10 text-blue-400`;
+      default:
+        return `${base} bg-[#30363d] text-[#8b949e]`;
+    }
+  };
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -152,12 +173,21 @@ export function Combobox({
               >
                 <Check
                   className={cn(
-                    'mr-2 h-4 w-4 text-emerald-400 transition-opacity',
+                    'mr-2 h-4 w-4 text-emerald-400 transition-opacity shrink-0',
                     value === option.value ? 'opacity-100' : 'opacity-0'
                   )}
                 />
-                {option.icon && <span className="mr-2">{option.icon}</span>}
-                <span className="truncate">{option.label}</span>
+                {option.icon && <span className="mr-2 shrink-0">{option.icon}</span>}
+                <span className="truncate flex-1">{option.label}</span>
+                {option.tags && option.tags.length > 0 && (
+                  <span className="ml-2 flex items-center gap-1 shrink-0">
+                    {option.tags.map((tag, idx) => (
+                      <span key={idx} className={getTagClassName(tag.variant)}>
+                        {tag.text}
+                      </span>
+                    ))}
+                  </span>
+                )}
               </button>
             ))
           )}

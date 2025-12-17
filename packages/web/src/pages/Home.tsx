@@ -8,8 +8,8 @@ import { useNavigate } from 'react-router-dom';
 import { useRequest } from 'ahooks';
 import { toast } from 'sonner';
 import SyncScrollEditor from '../components/SyncScrollEditor';
-import { generateReportStream, getModels, getConfig, type ModelInfo } from '../api';
-import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
+import { generateReportStream, getModels, getConfig, type ModelInfo, type Platform } from '../api';
+import { Combobox, type ComboboxOption, type ComboboxTag } from '@/components/ui/combobox';
 
 // 示例 Daily Log
 const SAMPLE_DAILY_LOG = `12-09 | 周一
@@ -54,7 +54,7 @@ export default function Home() {
   const { data: modelsData } = useRequest(getModels);
 
   // 加载配置并设置默认模型
-  useRequest(getConfig, {
+  const { data: configData } = useRequest(getConfig, {
     onSuccess: (data) => {
       if (data.defaultModel && !selectedModelId) {
         setSelectedModelId(data.defaultModel);
@@ -62,15 +62,47 @@ export default function Home() {
     },
   });
 
+  // 获取模型的平台
+  const getPlatform = (modelId: string): Platform => {
+    if (modelId.startsWith('siliconflow/')) return 'siliconflow';
+    if (modelId.startsWith('deepseek/')) return 'deepseek';
+    return 'openai';
+  };
+
   // 将模型列表转换为 Combobox 选项格式
   const modelOptions: ComboboxOption[] = useMemo(() => {
     const models = modelsData?.models || [];
-    return models.map((model: ModelInfo) => ({
-      value: model.id,
-      label: model.name,
-      icon: <span>{model.isFree ? '🆓' : '💰'}</span>,
-    }));
-  }, [modelsData?.models]);
+    const apiKeys: Record<Platform, boolean> = configData?.apiKeys || { siliconflow: false, deepseek: false, openai: false };
+    const defaultModel = configData?.defaultModel;
+
+    return models.map((model: ModelInfo) => {
+      const platform = getPlatform(model.id);
+      const isConfigured = apiKeys[platform];
+      const isDefault = model.id === defaultModel;
+
+      // 构建标签
+      const tags: ComboboxTag[] = [];
+
+      // 默认模型标签
+      if (isDefault) {
+        tags.push({ text: '默认', variant: 'info' });
+      }
+
+      // 可用性标签
+      if (isConfigured) {
+        tags.push({ text: '可用', variant: 'success' });
+      } else {
+        tags.push({ text: '需配置', variant: 'warning' });
+      }
+
+      return {
+        value: model.id,
+        label: model.name,
+        icon: <span>{model.isFree ? '🆓' : '💰'}</span>,
+        tags,
+      };
+    });
+  }, [modelsData?.models, configData?.apiKeys, configData?.defaultModel]);
 
   // 使用 useRequest 管理生成状态
   const {
