@@ -3,16 +3,11 @@
  * 支持 Monaco Editor 和 Markdown 预览的双向同步滚动
  */
 
-import {
-  useRef,
-  useCallback,
-  useEffect,
-  useMemo,
-  type ReactNode,
-} from 'react';
+import { useRef, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { throttle } from 'lodash-es';
 
 interface SyncScrollEditorProps {
   value: string;
@@ -154,92 +149,97 @@ export function SyncScrollEditor({
     [value]
   );
 
-  // 处理编辑器挂载
-  const handleEditorMount: OnMount = useCallback((editor) => {
-    editorRef.current = editor;
+  // 使用 throttle 优化编辑器滚动处理
+  const syncPreviewScroll = useMemo(
+    () =>
+      throttle((editor: MonacoEditor) => {
+        if (isScrollingFromPreview.current || !previewRef.current) return;
 
-    // 监听编辑器滚动
-    editor.onDidScrollChange(() => {
-      if (isScrollingFromPreview.current) return;
-      if (!previewRef.current) return;
+        isScrollingFromEditor.current = true;
 
-      isScrollingFromEditor.current = true;
+        const visibleRanges = editor.getVisibleRanges();
+        if (visibleRanges.length === 0) return;
 
-      // 获取编辑器可见行范围
-      const visibleRanges = editor.getVisibleRanges();
-      if (visibleRanges.length === 0) return;
+        const firstVisibleLine = visibleRanges[0].startLineNumber;
 
-      const firstVisibleLine = visibleRanges[0].startLineNumber;
+        // 在预览区找到对应行号的元素
+        const targetElement = previewRef.current.querySelector(
+          `[data-source-line="${firstVisibleLine}"]`
+        ) as HTMLElement;
 
-      // 在预览区找到对应行号的元素
-      const targetElement = previewRef.current.querySelector(
-        `[data-source-line="${firstVisibleLine}"]`
-      ) as HTMLElement;
+        if (targetElement) {
+          const containerRect = previewRef.current.getBoundingClientRect();
+          const elementRect = targetElement.getBoundingClientRect();
+          const offsetTop = elementRect.top - containerRect.top + previewRef.current.scrollTop;
 
-      if (targetElement) {
-        // 滚动到对应元素
-        const containerRect = previewRef.current.getBoundingClientRect();
-        const elementRect = targetElement.getBoundingClientRect();
-        const offsetTop = elementRect.top - containerRect.top + previewRef.current.scrollTop;
+          previewRef.current.scrollTo({
+            top: Math.max(0, offsetTop - 16),
+            behavior: 'auto',
+          });
+        } else {
+          // 百分比滚动作为后备
+          const model = editor.getModel();
+          if (!model) return;
 
-        previewRef.current.scrollTo({
-          top: Math.max(0, offsetTop - 16), // 16px 的顶部间距
-          behavior: 'auto',
-        });
-      } else {
-        // 如果没找到精确匹配，使用百分比滚动作为后备
-        const model = editor.getModel();
-        if (!model) return;
-
-        const totalLines = model.getLineCount();
-        const scrollPercentage = (firstVisibleLine - 1) / Math.max(1, totalLines - 1);
-        const maxScroll = previewRef.current.scrollHeight - previewRef.current.clientHeight;
-        previewRef.current.scrollTop = scrollPercentage * maxScroll;
-      }
-
-      // 延迟重置标志
-      clearTimeout(scrollTimeoutRef.current);
-      scrollTimeoutRef.current = setTimeout(() => {
-        isScrollingFromEditor.current = false;
-      }, 100);
-    });
-  }, []);
-
-  // 处理预览区滚动
-  const handlePreviewScroll = useCallback(() => {
-    if (isScrollingFromEditor.current) return;
-    if (!previewRef.current || !editorRef.current) return;
-
-    isScrollingFromPreview.current = true;
-
-    const container = previewRef.current;
-    const containerRect = container.getBoundingClientRect();
-
-    // 找到当前视口中第一个可见的带有行号的元素
-    const elements = container.querySelectorAll('[data-source-line]');
-    let targetLine = 1;
-
-    for (const element of elements) {
-      const rect = element.getBoundingClientRect();
-      // 如果元素在容器视口内
-      if (rect.top >= containerRect.top - 10 && rect.top <= containerRect.bottom) {
-        const line = parseInt(element.getAttribute('data-source-line') || '1', 10);
-        if (line > 0) {
-          targetLine = line;
-          break;
+          const totalLines = model.getLineCount();
+          const scrollPercentage = (firstVisibleLine - 1) / Math.max(1, totalLines - 1);
+          const maxScroll = previewRef.current.scrollHeight - previewRef.current.clientHeight;
+          previewRef.current.scrollTop = scrollPercentage * maxScroll;
         }
-      }
-    }
 
-    // 滚动编辑器到对应行
-    editorRef.current.revealLineInCenter(targetLine);
+        // 延迟重置标志
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = setTimeout(() => {
+          isScrollingFromEditor.current = false;
+        }, 100);
+      }, 50),
+    []
+  );
 
-    // 延迟重置标志
-    clearTimeout(scrollTimeoutRef.current);
-    scrollTimeoutRef.current = setTimeout(() => {
-      isScrollingFromPreview.current = false;
-    }, 100);
-  }, []);
+  // 处理编辑器挂载
+  const handleEditorMount: OnMount = useCallback(
+    (editor) => {
+      editorRef.current = editor;
+      editor.onDidScrollChange(() => syncPreviewScroll(editor));
+    },
+    [syncPreviewScroll]
+  );
+
+  // 使用 throttle 优化预览区滚动处理
+  const handlePreviewScroll = useMemo(
+    () =>
+      throttle(() => {
+        if (isScrollingFromEditor.current || !previewRef.current || !editorRef.current) return;
+
+        isScrollingFromPreview.current = true;
+
+        const container = previewRef.current;
+        const containerRect = container.getBoundingClientRect();
+
+        // 找到当前视口中第一个可见的带有行号的元素
+        const elements = container.querySelectorAll('[data-source-line]');
+        let targetLine = 1;
+
+        for (const element of elements) {
+          const rect = element.getBoundingClientRect();
+          if (rect.top >= containerRect.top - 10 && rect.top <= containerRect.bottom) {
+            const line = parseInt(element.getAttribute('data-source-line') || '1', 10);
+            if (line > 0) {
+              targetLine = line;
+              break;
+            }
+          }
+        }
+
+        editorRef.current.revealLineInCenter(targetLine);
+
+        clearTimeout(scrollTimeoutRef.current);
+        scrollTimeoutRef.current = setTimeout(() => {
+          isScrollingFromPreview.current = false;
+        }, 100);
+      }, 50),
+    []
+  );
 
   // 清理
   useEffect(() => {
@@ -247,8 +247,11 @@ export function SyncScrollEditor({
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
+      // 清理 throttle 函数
+      syncPreviewScroll.cancel();
+      handlePreviewScroll.cancel();
     };
-  }, []);
+  }, [syncPreviewScroll, handlePreviewScroll]);
 
   return (
     <section className="flex-1 flex gap-3 min-h-0">

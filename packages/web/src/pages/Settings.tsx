@@ -2,29 +2,11 @@
  * 设置页面 - 模型管理
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-// 模型信息类型
-interface ModelInfo {
-  id: string;
-  name: string;
-  description: string;
-  isFree: boolean;
-}
-
-// 平台类型
-type Platform = 'siliconflow' | 'deepseek' | 'openai';
-
-// 配置类型
-interface Config {
-  defaultModel: string | null;
-  apiKeys: {
-    siliconflow: string | null;
-    deepseek: string | null;
-    openai: string | null;
-  };
-}
+import { useRequest } from 'ahooks';
+import { toast } from 'sonner';
+import { getModels, getConfig, saveConfig, type ModelInfo, type Platform, type AppConfig } from '../api';
 
 // 平台信息
 const PLATFORMS: Array<{ key: Platform; name: string; url: string }> = [
@@ -35,14 +17,7 @@ const PLATFORMS: Array<{ key: Platform; name: string; url: string }> = [
 
 export default function Settings() {
   const navigate = useNavigate();
-  const [models, setModels] = useState<ModelInfo[]>([]);
-  const [config, setConfig] = useState<Config>({
-    defaultModel: null,
-    apiKeys: { siliconflow: null, deepseek: null, openai: null },
-  });
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
   // 编辑中的 API Keys
   const [editingKeys, setEditingKeys] = useState<Record<Platform, string>>({
@@ -51,81 +26,48 @@ export default function Settings() {
     openai: '',
   });
 
-  // 加载模型列表和配置
-  useEffect(() => {
-    Promise.all([
-      fetch('/api/models').then((r) => r.json()),
-      fetch('/api/config').then((r) => r.json()),
-    ])
-      .then(([modelsData, configData]) => {
-        setModels(modelsData.models || []);
-        setConfig({
-          defaultModel: configData.defaultModel || null,
-          apiKeys: configData.apiKeys || { siliconflow: null, deepseek: null, openai: null },
-        });
-        // 设置编辑中的 keys（已配置的显示为占位符）
-        setEditingKeys({
-          siliconflow: '',
-          deepseek: '',
-          openai: '',
-        });
-      })
-      .catch((err) => {
-        console.error('加载配置失败:', err);
-        setMessage({ type: 'error', text: '加载配置失败' });
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  // 使用 useRequest 加载模型列表
+  const { data: modelsData, loading: modelsLoading } = useRequest(getModels);
 
-  // 保存配置
-  const handleSave = useCallback(async () => {
-    setSaving(true);
-    setMessage(null);
+  // 使用 useRequest 加载配置
+  const { data: configData, loading: configLoading, refresh: refreshConfig } = useRequest(getConfig, {
+    onSuccess: (data) => {
+      setSelectedModel(data.defaultModel);
+    },
+  });
 
-    try {
-      const response = await fetch('/api/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          defaultModel: config.defaultModel,
-          apiKeys: {
-            siliconflow: editingKeys.siliconflow || undefined,
-            deepseek: editingKeys.deepseek || undefined,
-            openai: editingKeys.openai || undefined,
-          },
-        }),
+  // 使用 useRequest 保存配置
+  const { loading: saving, run: handleSave } = useRequest(
+    async () => {
+      const result = await saveConfig({
+        defaultModel: selectedModel || undefined,
+        apiKeys: {
+          siliconflow: editingKeys.siliconflow || undefined,
+          deepseek: editingKeys.deepseek || undefined,
+          openai: editingKeys.openai || undefined,
+        },
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || '保存失败');
-      }
-
-      setMessage({ type: 'success', text: '保存成功！' });
-
-      // 清空输入框
+      // 清空输入框并刷新配置
       setEditingKeys({ siliconflow: '', deepseek: '', openai: '' });
+      await refreshConfig();
 
-      // 重新加载配置
-      const configData = await fetch('/api/config').then((r) => r.json());
-      setConfig({
-        defaultModel: configData.defaultModel || null,
-        apiKeys: configData.apiKeys || { siliconflow: null, deepseek: null, openai: null },
-      });
-    } catch (err) {
-      setMessage({
-        type: 'error',
-        text: err instanceof Error ? err.message : '保存失败',
-      });
-    } finally {
-      setSaving(false);
+      return result;
+    },
+    {
+      manual: true,
+      onSuccess: () => {
+        toast.success('保存成功！');
+      },
+      onError: (err) => {
+        toast.error(err.message || '保存失败');
+      },
     }
-  }, [config.defaultModel, editingKeys]);
+  );
 
-  // 选择默认模型
-  const handleSelectModel = useCallback((modelId: string) => {
-    setConfig((prev) => ({ ...prev, defaultModel: modelId }));
-  }, []);
+  const models = modelsData?.models || [];
+  const config: AppConfig = configData || { defaultModel: null, apiKeys: { siliconflow: false, deepseek: false, openai: false } };
+  const loading = modelsLoading || configLoading;
 
   // 获取模型的平台
   const getPlatform = (modelId: string): Platform => {
@@ -179,22 +121,6 @@ export default function Settings() {
       {/* 主内容区 */}
       <main className="flex-1 overflow-auto p-6">
         <div className="max-w-4xl mx-auto space-y-8">
-          {/* 消息提示 */}
-          {message && (
-            <div
-              className={`
-                px-4 py-3 rounded-lg text-sm
-                ${
-                  message.type === 'success'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                }
-              `}
-            >
-              {message.type === 'success' ? '✓' : '✗'} {message.text}
-            </div>
-          )}
-
           {/* API Keys 配置 */}
           <section className="bg-[#161b22] rounded-lg border border-[#30363d] p-6">
             <h2 className="text-lg font-semibold text-[#f0f6fc] mb-4">🔑 API Keys</h2>
@@ -256,16 +182,16 @@ export default function Settings() {
               <h3 className="text-sm font-medium text-emerald-400 mb-3">🆓 免费模型</h3>
               <div className="grid gap-3">
                 {models
-                  .filter((m) => m.isFree)
-                  .map((model) => {
+                  .filter((m: ModelInfo) => m.isFree)
+                  .map((model: ModelInfo) => {
                     const platform = getPlatform(model.id);
                     const isConfigured = isPlatformConfigured(platform);
-                    const isSelected = config.defaultModel === model.id;
+                    const isSelected = selectedModel === model.id;
 
                     return (
                       <button
                         key={model.id}
-                        onClick={() => handleSelectModel(model.id)}
+                        onClick={() => setSelectedModel(model.id)}
                         className={`
                           w-full p-4 rounded-lg border text-left transition-all duration-200
                           ${
@@ -305,16 +231,16 @@ export default function Settings() {
               <h3 className="text-sm font-medium text-yellow-400 mb-3">💰 收费模型</h3>
               <div className="grid gap-3">
                 {models
-                  .filter((m) => !m.isFree)
-                  .map((model) => {
+                  .filter((m: ModelInfo) => !m.isFree)
+                  .map((model: ModelInfo) => {
                     const platform = getPlatform(model.id);
                     const isConfigured = isPlatformConfigured(platform);
-                    const isSelected = config.defaultModel === model.id;
+                    const isSelected = selectedModel === model.id;
 
                     return (
                       <button
                         key={model.id}
-                        onClick={() => handleSelectModel(model.id)}
+                        onClick={() => setSelectedModel(model.id)}
                         className={`
                           w-full p-4 rounded-lg border text-left transition-all duration-200
                           ${
@@ -354,4 +280,3 @@ export default function Settings() {
     </div>
   );
 }
-

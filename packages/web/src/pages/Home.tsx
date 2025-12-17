@@ -3,9 +3,13 @@
  * 主页面组件
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRequest } from 'ahooks';
+import { toast } from 'sonner';
 import SyncScrollEditor from '../components/SyncScrollEditor';
+import { generateReportStream, getModels, getConfig, type ModelInfo } from '../api';
+import { Combobox, type ComboboxOption } from '@/components/ui/combobox';
 
 // 示例 Daily Log
 const SAMPLE_DAILY_LOG = `12-09 | 周一
@@ -42,117 +46,92 @@ export default function Home() {
   const navigate = useNavigate();
   const [dailyLog, setDailyLog] = useState(SAMPLE_DAILY_LOG);
   const [report, setReport] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [copySuccess, setCopySuccess] = useState(false);
   const [modelInfo, setModelInfo] = useState<{ id: string; name: string } | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // 流式生成周报
-  const handleGenerate = useCallback(async () => {
-    if (!dailyLog.trim()) {
-      setError('请输入 Daily Log 内容');
-      return;
-    }
+  // 加载模型列表
+  const { data: modelsData } = useRequest(getModels);
 
-    // 取消之前的请求
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
+  // 加载配置并设置默认模型
+  useRequest(getConfig, {
+    onSuccess: (data) => {
+      if (data.defaultModel && !selectedModelId) {
+        setSelectedModelId(data.defaultModel);
+      }
+    },
+  });
 
-    abortControllerRef.current = new AbortController();
-    setIsGenerating(true);
-    setError(null);
-    setReport(''); // 清空之前的内容
-    setModelInfo(null);
+  // 将模型列表转换为 Combobox 选项格式
+  const modelOptions: ComboboxOption[] = useMemo(() => {
+    const models = modelsData?.models || [];
+    return models.map((model: ModelInfo) => ({
+      value: model.id,
+      label: model.name,
+      icon: <span>{model.isFree ? '🆓' : '💰'}</span>,
+    }));
+  }, [modelsData?.models]);
 
-    try {
-      const response = await fetch('/api/generate/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dailyLog }),
-        signal: abortControllerRef.current.signal,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || '生成失败');
+  // 使用 useRequest 管理生成状态
+  const {
+    loading: isGenerating,
+    run: handleGenerate,
+    cancel: handleCancel,
+  } = useRequest(
+    async () => {
+      if (!dailyLog.trim()) {
+        throw new Error('请输入 Daily Log 内容');
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('无法读取响应流');
+      // 取消之前的请求
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
 
-      const decoder = new TextDecoder();
-      let buffer = '';
+      abortControllerRef.current = new AbortController();
+      setReport('');
+      setModelInfo(null);
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      const result = await generateReportStream(
+        dailyLog,
+        (chunk) => setReport((prev) => prev + chunk),
+        abortControllerRef.current.signal,
+        selectedModelId || undefined
+      );
 
-        buffer += decoder.decode(value, { stream: true });
-
-        // 处理 SSE 数据
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // 保留未完成的行
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-
-              if (data.chunk) {
-                setReport((prev) => prev + data.chunk);
-              }
-
-              if (data.done) {
-                setModelInfo(data.model);
-              }
-
-              if (data.error) {
-                throw new Error(data.error);
-              }
-            } catch (e) {
-              // JSON 解析错误，忽略
-              if (e instanceof SyntaxError) continue;
-              throw e;
-            }
-          }
-        }
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        // 用户取消，不显示错误
-        return;
-      }
-      setError(err instanceof Error ? err.message : '生成周报失败');
-    } finally {
-      setIsGenerating(false);
+      setModelInfo(result.model);
       abortControllerRef.current = null;
+      return result;
+    },
+    {
+      manual: true,
+      onError: (err) => {
+        // AbortError 不显示错误
+        if (err.name === 'AbortError') return;
+        toast.error(err.message || '生成失败');
+      },
     }
-  }, [dailyLog]);
-
-  // 取消生成
-  const handleCancel = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setIsGenerating(false);
-    }
-  }, []);
+  );
 
   // 复制周报
-  const handleCopy = useCallback(async () => {
+  const handleCopy = async () => {
     if (!report) return;
 
     try {
       await navigator.clipboard.writeText(report);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      toast.success('已复制到剪贴板');
     } catch {
-      setError('复制失败，请手动复制');
+      toast.error('复制失败');
     }
-  }, [report]);
+  };
+
+  // 取消生成
+  const onCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    handleCancel();
+  };
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#0d1117]">
@@ -171,12 +150,7 @@ export default function Home() {
             className="p-2 rounded-lg text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors"
             title="设置"
           >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -208,9 +182,22 @@ export default function Home() {
 
         {/* 生成按钮区 */}
         <div className="flex items-center justify-center gap-4 py-2">
+          {/* 模型选择器 */}
+          <Combobox
+            options={modelOptions}
+            value={selectedModelId}
+            onValueChange={setSelectedModelId}
+            placeholder={modelOptions.length === 0 ? '加载中...' : '选择模型'}
+            searchPlaceholder="搜索模型..."
+            emptyText="未找到模型"
+            disabled={isGenerating}
+            className="w-[280px]"
+          />
+
+          {/* 生成/取消按钮 */}
           {isGenerating ? (
             <button
-              onClick={handleCancel}
+              onClick={onCancel}
               className="px-8 py-2.5 rounded-lg font-medium text-sm bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all duration-200"
             >
               <span className="flex items-center gap-2">
@@ -250,12 +237,6 @@ export default function Home() {
             </button>
           )}
 
-          {error && (
-            <span className="text-sm text-red-400 bg-red-400/10 px-3 py-1.5 rounded-lg">
-              ❌ {error}
-            </span>
-          )}
-
           {modelInfo && !isGenerating && (
             <span className="text-sm text-emerald-400 bg-emerald-400/10 px-3 py-1.5 rounded-lg">
               ✓ 由 {modelInfo.name} 生成
@@ -290,13 +271,11 @@ export default function Home() {
                 ${
                   !report || isGenerating
                     ? 'bg-[#30363d] text-[#484f58] cursor-not-allowed'
-                    : copySuccess
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-[#238636] text-white hover:bg-[#2ea043]'
+                    : 'bg-[#238636] text-white hover:bg-[#2ea043]'
                 }
               `}
             >
-              {copySuccess ? '✓ 已复制' : '📋 复制'}
+              📋 复制
             </button>
           }
         />
