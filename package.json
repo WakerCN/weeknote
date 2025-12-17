@@ -7,16 +7,15 @@
   "scripts": {
     "dev": "pnpm -r dev",
     "build": "pnpm -r build",
+    "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "lint:fix": "eslint packages/*/src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,css}\"",
     "test": "pnpm -r test",
     "dev:web": "pnpm --filter @weeknote/web dev",
     "dev:cli": "pnpm --filter @weeknote/cli dev",
     "build:core": "pnpm --filter @weeknote/core build",
     "build:cli": "pnpm --filter @weeknote/cli build",
-    "build:web": "pnpm --filter @weeknote/web build",
-    "lint": "eslint packages/*/src",
-    "lint:fix": "eslint packages/*/src --fix",
-    "format": "prettier --write \"packages/*/src/**/*.{ts,tsx,css}\"",
-    "format:check": "prettier --check \"packages/*/src/**/*.{ts,tsx,css}\""
+    "build:web": "pnpm --filter @weeknote/web build"
   },
   "keywords": [
     "weekly-report",
