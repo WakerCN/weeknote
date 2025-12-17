@@ -13,3 +13,4 @@ export {
   type ConfigSetOptions,
   type ConfigKeyOptions,
 } from './config.js';
+export { runServe } from './serve.js';

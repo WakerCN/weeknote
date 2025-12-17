@@ -14,6 +14,7 @@ import {
   runConfigKey,
   runConfigDefault,
   runConfigInit,
+  runServe,
 } from './commands/index.js';
 
 const program = new Command();
@@ -84,6 +85,17 @@ configCmd
   .description('显示所有可用模型')
   .action(() => {
     runConfigModels();
+  });
+
+// serve 命令 - 启动 Web 界面
+program
+  .command('serve')
+  .alias('web')
+  .description('启动 Web 界面')
+  .option('-p, --port <port>', '服务器端口', '3000')
+  .option('--no-open', '不自动打开浏览器')
+  .action(async (options) => {
+    await runServe(options);
   });
 
 program.parse();
