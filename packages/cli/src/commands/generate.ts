@@ -127,9 +127,6 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
     // 5. 生成周报
     let reportContent: string;
-    let resultModelId: string;
-    let resultModelName: string;
-    let usedFallback: boolean;
 
     if (options.stream) {
       console.log(chalk.gray('\n⏳ 正在生成周报...\n'));
@@ -140,9 +137,6 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       });
 
       reportContent = result.report.rawMarkdown;
-      resultModelId = result.modelId;
-      resultModelName = result.modelName;
-      usedFallback = result.usedFallback;
 
       console.log('\n' + '='.repeat(60));
     } else {
@@ -150,9 +144,6 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
 
       const result = await generateReport(weeklyLog, config);
       reportContent = result.report.rawMarkdown;
-      resultModelId = result.modelId;
-      resultModelName = result.modelName;
-      usedFallback = result.usedFallback;
 
       spinner.succeed(chalk.green('生成完成！'));
 
@@ -161,10 +152,6 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       console.log('='.repeat(60));
       console.log(reportContent);
       console.log('='.repeat(60));
-    }
-
-    if (usedFallback) {
-      console.log(chalk.yellow(`⚠️  使用了降级模型: ${resultModelName} (${resultModelId})`));
     }
 
     // 6. 输出到文件

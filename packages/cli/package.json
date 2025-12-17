@@ -1,17 +1,39 @@
 {
-  "name": "@weeknote/cli",
+  "name": "weeknote-cli",
   "version": "1.0.0",
-  "description": "CLI tool for Weekly Report Optimizer",
+  "description": "AI-powered weekly report generator - CLI tool",
   "type": "module",
   "bin": {
     "weeknote": "./dist/index.js"
   },
   "scripts": {
     "dev": "tsc --watch",
+    "dev:server": "node --watch dist/index.js serve --no-open",
     "build": "tsc && pnpm build:web",
     "build:web": "cd ../web && pnpm build",
     "lint": "eslint src/",
     "start": "node dist/index.js"
+  },
+  "keywords": [
+    "weeknote",
+    "weekly-report",
+    "ai",
+    "cli",
+    "productivity",
+    "daily-log"
+  ],
+  "author": "",
+  "license": "MIT",
+  "homepage": "https://github.com/user/weeknote#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/user/weeknote.git"
+  },
+  "bugs": {
+    "url": "https://github.com/user/weeknote/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@weeknote/core": "workspace:*",

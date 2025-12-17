@@ -25,11 +25,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           },
           classNames: {
             toast: 'font-medium',
-            success: '!border-emerald-500/50 !text-emerald-400 [&>svg]:!text-emerald-400',
-            error: '!border-red-500/50 !text-red-400 [&>svg]:!text-red-400',
-            warning: '!border-yellow-500/50 !text-yellow-400 [&>svg]:!text-yellow-400',
-            info: '!border-blue-500/50 !text-blue-400 [&>svg]:!text-blue-400',
-            loading: '!border-gray-500/50 !text-gray-400',
+            success:
+              '!bg-[#0d2818] !border-emerald-500/50 !text-emerald-300 [&>svg]:!text-emerald-400',
+            error: '!bg-[#2a1215] !border-red-500/50 !text-red-300 [&>svg]:!text-red-400',
+            warning:
+              '!bg-[#2a2008] !border-yellow-500/50 !text-yellow-300 [&>svg]:!text-yellow-400',
+            info: '!bg-[#0d1a2a] !border-blue-500/50 !text-blue-300 [&>svg]:!text-blue-400',
+            loading: '!bg-[#1a1a1a] !border-gray-500/50 !text-gray-300',
           },
         }}
         icons={{

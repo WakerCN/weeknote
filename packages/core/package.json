@@ -18,6 +18,8 @@
     "test": "vitest"
   },
   "dependencies": {
+    "https-proxy-agent": "^7.0.6",
+    "node-fetch": "^3.3.2",
     "openai": "^4.67.0"
   },
   "devDependencies": {

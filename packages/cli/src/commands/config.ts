@@ -9,7 +9,6 @@ import type { ModelId } from '@weeknote/core';
 import {
   loadConfig,
   setPrimaryConfig,
-  addFallbackConfig,
   setDefaultModel,
   setApiKey,
   getApiKey,
@@ -25,7 +24,6 @@ import {
 export interface ConfigSetOptions {
   model: string;
   key: string;
-  fallback?: boolean;
 }
 
 export interface ConfigKeyOptions {
@@ -52,13 +50,8 @@ export function runConfigSet(options: ConfigSetOptions): void {
 
   const meta = MODEL_REGISTRY[modelId];
 
-  if (options.fallback) {
-    addFallbackConfig(modelId, options.key);
-    console.log(chalk.green(`✅ 已添加降级模型: ${meta.name} (${modelId})`));
-  } else {
-    setPrimaryConfig(modelId, options.key);
-    console.log(chalk.green(`✅ 已设置主模型: ${meta.name} (${modelId})`));
-  }
+  setPrimaryConfig(modelId, options.key);
+  console.log(chalk.green(`✅ 已设置模型: ${meta.name} (${modelId})`));
 
   if (meta.isFree) {
     console.log(chalk.cyan('   💡 这是一个免费模型'));

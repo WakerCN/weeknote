@@ -58,7 +58,6 @@ function getApiConfig(overrideModelId?: string) {
 
   return {
     primary: { modelId, apiKey },
-    enableFallback: false,
   };
 }
 

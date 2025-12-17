@@ -52,7 +52,6 @@ configCmd
   .description('设置模型和 API Key（同时设置）')
   .requiredOption('-m, --model <id>', '模型 ID (如: siliconflow/qwen2.5-7b)')
   .requiredOption('-k, --key <apiKey>', 'API Key')
-  .option('--fallback', '设置为降级模型')
   .action((options) => {
     runConfigSet(options);
   });

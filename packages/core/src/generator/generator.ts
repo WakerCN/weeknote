@@ -18,8 +18,6 @@ export interface GenerateResult {
   modelId: ModelId;
   /** 实际使用的模型名称 */
   modelName: string;
-  /** 是否使用了降级模型 */
-  usedFallback: boolean;
 }
 
 /**
@@ -134,8 +132,6 @@ export async function generateReport(
 
   const manager = new ModelManager({
     primary: config.primary,
-    fallback: config.fallback,
-    enableFallback: config.enableFallback,
   });
 
   const { content, modelId } = await manager.generate(messages);
@@ -146,7 +142,6 @@ export async function generateReport(
     report,
     modelId,
     modelName: modelMeta?.name || modelId,
-    usedFallback: modelId !== config.primary.modelId,
   };
 }
 
@@ -162,8 +157,6 @@ export async function generateReportStream(
 
   const manager = new ModelManager({
     primary: config.primary,
-    fallback: config.fallback,
-    enableFallback: config.enableFallback,
   });
 
   const { content, modelId } = await manager.generateStream(messages, onChunk);
@@ -174,6 +167,5 @@ export async function generateReportStream(
     report,
     modelId,
     modelName: modelMeta?.name || modelId,
-    usedFallback: modelId !== config.primary.modelId,
   };
 }

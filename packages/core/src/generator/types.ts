@@ -143,12 +143,8 @@ export interface ModelConfig {
  * 生成器配置
  */
 export interface GeneratorConfig {
-  /** 主模型配置 */
+  /** 模型配置 */
   primary: ModelConfig;
-  /** 备用模型列表（按优先级排序） */
-  fallback?: ModelConfig[];
-  /** 是否启用自动降级，默认 true */
-  enableFallback?: boolean;
   /** 超时时间（毫秒），默认 60000 */
   timeout?: number;
 }

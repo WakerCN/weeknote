@@ -20,7 +20,7 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 export type Platform = 'siliconflow' | 'deepseek' | 'openai';
 
 /**
- * 配置文件结构（新版）
+ * 配置文件结构
  */
 export interface CLIConfig {
   /** 默认模型 */
@@ -36,10 +36,6 @@ export interface CLIConfig {
     modelId: ModelId;
     apiKey: string;
   };
-  fallback?: Array<{
-    modelId: ModelId;
-    apiKey: string;
-  }>;
 }
 
 /**
@@ -122,13 +118,12 @@ export function getDefaultModel(): ModelId {
 }
 
 /**
- * 设置主模型配置（兼容旧版）
+ * 设置主模型配置
  */
 export function setPrimaryConfig(modelId: ModelId, apiKey: string): void {
   const config = loadConfig();
   const platform = getPlatformFromModelId(modelId);
 
-  // 同时更新新版和旧版配置
   config.defaultModel = modelId;
   if (!config.apiKeys) {
     config.apiKeys = {};
@@ -137,32 +132,6 @@ export function setPrimaryConfig(modelId: ModelId, apiKey: string): void {
 
   // 保留旧版格式兼容
   config.primary = { modelId, apiKey };
-  saveConfig(config);
-}
-
-/**
- * 添加降级模型配置
- */
-export function addFallbackConfig(modelId: ModelId, apiKey: string): void {
-  const config = loadConfig();
-  const platform = getPlatformFromModelId(modelId);
-
-  // 更新 API Key
-  if (!config.apiKeys) {
-    config.apiKeys = {};
-  }
-  config.apiKeys[platform] = apiKey;
-
-  // 保留旧版格式
-  if (!config.fallback) {
-    config.fallback = [];
-  }
-  const existingIndex = config.fallback.findIndex((f) => f.modelId === modelId);
-  if (existingIndex >= 0) {
-    config.fallback[existingIndex] = { modelId, apiKey };
-  } else {
-    config.fallback.push({ modelId, apiKey });
-  }
   saveConfig(config);
 }
 
@@ -185,30 +154,8 @@ export function toGeneratorConfig(cliConfig: CLIConfig): GeneratorConfig | null 
     return null;
   }
 
-  // 构建降级模型列表
-  const fallback: Array<{ modelId: ModelId; apiKey: string }> = [];
-
-  // 添加其他平台的模型作为降级
-  const platforms: Platform[] = ['siliconflow', 'deepseek', 'openai'];
-  for (const p of platforms) {
-    if (p !== platform && cliConfig.apiKeys?.[p]) {
-      // 为每个平台选择一个默认模型
-      let fallbackModelId: ModelId;
-      if (p === 'siliconflow') fallbackModelId = 'siliconflow/qwen2.5-7b';
-      else if (p === 'deepseek') fallbackModelId = 'deepseek/deepseek-chat';
-      else fallbackModelId = 'openai/gpt-4o';
-
-      fallback.push({
-        modelId: fallbackModelId,
-        apiKey: cliConfig.apiKeys[p]!,
-      });
-    }
-  }
-
   return {
     primary: { modelId: defaultModel, apiKey },
-    fallback: fallback.length > 0 ? fallback : undefined,
-    enableFallback: fallback.length > 0,
   };
 }
 
@@ -222,37 +169,20 @@ export function getConfigFromEnv(): GeneratorConfig | null {
 
   // 优先使用免费模型
   if (siliconflowKey) {
-    const configs: Array<{ modelId: ModelId; apiKey: string }> = [
-      { modelId: DEFAULT_MODEL, apiKey: siliconflowKey },
-    ];
-
-    if (deepseekKey) {
-      configs.push({ modelId: 'deepseek/deepseek-chat', apiKey: deepseekKey });
-    }
-    if (openaiKey) {
-      configs.push({ modelId: 'openai/gpt-4o', apiKey: openaiKey });
-    }
-
-    const [primary, ...fallback] = configs;
     return {
-      primary: { modelId: primary.modelId, apiKey: primary.apiKey },
-      fallback: fallback.map((f) => ({ modelId: f.modelId, apiKey: f.apiKey })),
-      enableFallback: true,
+      primary: { modelId: DEFAULT_MODEL, apiKey: siliconflowKey },
     };
   }
 
   if (deepseekKey) {
     return {
       primary: { modelId: 'deepseek/deepseek-chat', apiKey: deepseekKey },
-      fallback: openaiKey ? [{ modelId: 'openai/gpt-4o', apiKey: openaiKey }] : [],
-      enableFallback: !!openaiKey,
     };
   }
 
   if (openaiKey) {
     return {
       primary: { modelId: 'openai/gpt-4o', apiKey: openaiKey },
-      enableFallback: false,
     };
   }
 

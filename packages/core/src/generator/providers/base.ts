@@ -4,8 +4,37 @@
  */
 
 import OpenAI from 'openai';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import type { RequestInit } from 'node-fetch';
+import nodeFetch from 'node-fetch';
 import type { ChatMessage, LLMProvider, ModelConfig, ModelId } from '../types.js';
 import { GeneratorError, MODEL_REGISTRY } from '../types.js';
+
+/**
+ * 获取代理 URL
+ */
+function getProxyUrl(): string | undefined {
+  return process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.https_proxy || process.env.http_proxy;
+}
+
+/**
+ * 创建带代理的 fetch 函数
+ */
+function createProxyFetch() {
+  const proxyUrl = getProxyUrl();
+  if (!proxyUrl) {
+    return undefined;
+  }
+  
+  const agent = new HttpsProxyAgent(proxyUrl);
+  
+  return async (url: string, init?: RequestInit) => {
+    return nodeFetch(url, {
+      ...init,
+      agent,
+    } as RequestInit);
+  };
+}
 
 /**
  * 基于 OpenAI SDK 的通用 Provider
@@ -33,11 +62,21 @@ export class OpenAICompatibleProvider implements LLMProvider {
    */
   protected createClient(config: ModelConfig): OpenAI {
     const meta = this.getModelMeta();
-    return new OpenAI({
+    const proxyFetch = createProxyFetch();
+    
+    const options: ConstructorParameters<typeof OpenAI>[0] = {
       apiKey: config.apiKey,
       baseURL: config.baseUrl || meta.baseUrl,
       timeout: 60000,
-    });
+    };
+    
+    // 如果有代理，使用自定义 fetch
+    if (proxyFetch) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      options.fetch = proxyFetch as any;
+    }
+    
+    return new OpenAI(options);
   }
 
   /**
