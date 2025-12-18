@@ -5,7 +5,7 @@
 import type { WeeklyLog, WeeklyReport } from '../types/index.js';
 import type { GeneratorConfig, ModelId } from './types.js';
 import { MODEL_REGISTRY } from './types.js';
-import { buildMessages } from '../prompt/index.js';
+import { buildMessages, type CustomPromptTemplate } from '../prompt/index.js';
 import { ModelManager } from './model-manager.js';
 
 /**
@@ -122,13 +122,22 @@ function extractIssues(
 }
 
 /**
+ * 生成选项
+ */
+export interface GenerateOptions {
+  /** 自定义 Prompt 模板 */
+  customTemplate?: CustomPromptTemplate;
+}
+
+/**
  * 从解析后的日志生成周报
  */
 export async function generateReport(
   weeklyLog: WeeklyLog,
-  config: GeneratorConfig
+  config: GeneratorConfig,
+  options?: GenerateOptions
 ): Promise<GenerateResult> {
-  const messages = buildMessages(weeklyLog);
+  const messages = buildMessages(weeklyLog, options?.customTemplate);
 
   const manager = new ModelManager({
     primary: config.primary,
@@ -151,9 +160,10 @@ export async function generateReport(
 export async function generateReportStream(
   weeklyLog: WeeklyLog,
   config: GeneratorConfig,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  options?: GenerateOptions
 ): Promise<GenerateResult> {
-  const messages = buildMessages(weeklyLog);
+  const messages = buildMessages(weeklyLog, options?.customTemplate);
 
   const manager = new ModelManager({
     primary: config.primary,

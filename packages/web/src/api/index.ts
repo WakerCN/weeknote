@@ -33,6 +33,35 @@ export interface GenerateResult {
   model: { id: string; name: string };
 }
 
+// Prompt 模板类型
+export interface PromptTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  systemPrompt: string;
+  userPromptTemplate: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Prompts 配置响应
+export interface PromptsResponse {
+  activeTemplateId: string;
+  templates: PromptTemplate[];
+  defaults: {
+    systemPrompt: string;
+    userPromptTemplate: string;
+  };
+}
+
+// 创建/更新模板参数
+export interface SavePromptParams {
+  name: string;
+  description?: string;
+  systemPrompt: string;
+  userPromptTemplate: string;
+}
+
 // 创建 axios 实例
 const api = axios.create({
   baseURL: '/api',
@@ -154,6 +183,37 @@ export async function generateReportStream(
 
   return result;
 }
+
+// ========== Prompt 模板 API ==========
+
+/**
+ * 获取所有 Prompt 模板
+ */
+export const getPrompts = () => api.get<unknown, PromptsResponse>('/prompts');
+
+/**
+ * 创建新模板
+ */
+export const createPrompt = (params: SavePromptParams) =>
+  api.post<unknown, { success: boolean; template: PromptTemplate }>('/prompts', params);
+
+/**
+ * 更新模板
+ */
+export const updatePrompt = (id: string, params: Partial<SavePromptParams>) =>
+  api.put<unknown, { success: boolean; template: PromptTemplate }>(`/prompts/${id}`, params);
+
+/**
+ * 删除模板
+ */
+export const deletePrompt = (id: string) =>
+  api.delete<unknown, { success: boolean }>(`/prompts/${id}`);
+
+/**
+ * 激活模板
+ */
+export const activatePrompt = (id: string) =>
+  api.post<unknown, { success: boolean }>(`/prompts/${id}/activate`);
 
 export default api;
 

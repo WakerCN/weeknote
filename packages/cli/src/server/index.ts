@@ -24,6 +24,16 @@ import {
   getPlatformFromModelId,
   type CLIConfig,
 } from '../config.js';
+import {
+  loadPromptsConfig,
+  getActiveTemplate,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  setActiveTemplate,
+  DEFAULT_SYSTEM_PROMPT,
+  DEFAULT_USER_PROMPT_TEMPLATE,
+} from '../prompt-config.js';
 import type { Express } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -151,6 +161,145 @@ export function createServer(): Express {
     }
   });
 
+  // ========== Prompt 模板 API ==========
+
+  // 获取所有模板和激活状态
+  app.get('/api/prompts', (_req, res) => {
+    try {
+      const config = loadPromptsConfig();
+      res.json({
+        activeTemplateId: config.activeTemplateId,
+        templates: config.templates,
+        defaults: {
+          systemPrompt: DEFAULT_SYSTEM_PROMPT,
+          userPromptTemplate: DEFAULT_USER_PROMPT_TEMPLATE,
+        },
+      });
+    } catch (error) {
+      console.error('[API] 获取模板失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '获取模板失败',
+      });
+    }
+  });
+
+  // 创建新模板
+  app.post('/api/prompts', (req, res) => {
+    try {
+      const { name, description, systemPrompt, userPromptTemplate } = req.body;
+
+      if (!name || typeof name !== 'string') {
+        return res.status(400).json({ error: '模板名称不能为空' });
+      }
+
+      if (!systemPrompt || typeof systemPrompt !== 'string') {
+        return res.status(400).json({ error: '系统提示词不能为空' });
+      }
+
+      if (!userPromptTemplate || typeof userPromptTemplate !== 'string') {
+        return res.status(400).json({ error: '用户提示词模板不能为空' });
+      }
+
+      // 验证用户提示词模板包含 {{dailyLog}} 占位符
+      if (!userPromptTemplate.includes('{{dailyLog}}')) {
+        return res.status(400).json({ error: '用户提示词模板必须包含 {{dailyLog}} 占位符' });
+      }
+
+      const template = createTemplate({
+        name,
+        description,
+        systemPrompt,
+        userPromptTemplate,
+      });
+
+      console.log(`[API] 创建模板: ${template.name} (${template.id})`);
+
+      res.json({ success: true, template });
+    } catch (error) {
+      console.error('[API] 创建模板失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '创建模板失败',
+      });
+    }
+  });
+
+  // 更新模板
+  app.put('/api/prompts/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, systemPrompt, userPromptTemplate } = req.body;
+
+      // 验证用户提示词模板包含 {{dailyLog}} 占位符
+      if (userPromptTemplate && !userPromptTemplate.includes('{{dailyLog}}')) {
+        return res.status(400).json({ error: '用户提示词模板必须包含 {{dailyLog}} 占位符' });
+      }
+
+      const template = updateTemplate(id, {
+        name,
+        description,
+        systemPrompt,
+        userPromptTemplate,
+      });
+
+      if (!template) {
+        return res.status(404).json({ error: '模板不存在' });
+      }
+
+      console.log(`[API] 更新模板: ${template.name} (${template.id})`);
+
+      res.json({ success: true, template });
+    } catch (error) {
+      console.error('[API] 更新模板失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '更新模板失败',
+      });
+    }
+  });
+
+  // 删除模板
+  app.delete('/api/prompts/:id', (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const success = deleteTemplate(id);
+
+      if (!success) {
+        return res.status(400).json({ error: '无法删除模板（可能是最后一个模板或模板不存在）' });
+      }
+
+      console.log(`[API] 删除模板: ${id}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[API] 删除模板失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '删除模板失败',
+      });
+    }
+  });
+
+  // 激活模板
+  app.post('/api/prompts/:id/activate', (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const success = setActiveTemplate(id);
+
+      if (!success) {
+        return res.status(404).json({ error: '模板不存在' });
+      }
+
+      console.log(`[API] 激活模板: ${id}`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[API] 激活模板失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '激活模板失败',
+      });
+    }
+  });
+
   // 生成周报接口
   app.post('/api/generate', async (req, res) => {
     try {
@@ -174,14 +323,22 @@ export function createServer(): Express {
         });
       }
 
-      console.log(`[API] 开始生成周报，模型: ${config.primary.modelId}`);
+      // 获取激活的 Prompt 模板
+      const activeTemplate = getActiveTemplate();
+
+      console.log(`[API] 开始生成周报，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}`);
 
       // 解析 Daily Log
       const weeklyLog = parseDailyLog(dailyLog);
       console.log(`[API] 解析完成，共 ${weeklyLog.entries.length} 天`);
 
-      // 生成周报
-      const result = await generateReport(weeklyLog, config);
+      // 生成周报（使用自定义模板）
+      const result = await generateReport(weeklyLog, config, {
+        customTemplate: {
+          systemPrompt: activeTemplate.systemPrompt,
+          userPromptTemplate: activeTemplate.userPromptTemplate,
+        },
+      });
 
       console.log(`[API] 生成完成，使用模型: ${result.modelName}`);
 
@@ -222,6 +379,9 @@ export function createServer(): Express {
         });
       }
 
+      // 获取激活的 Prompt 模板
+      const activeTemplate = getActiveTemplate();
+
       // 设置 SSE 响应头
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -229,11 +389,21 @@ export function createServer(): Express {
 
       const weeklyLog = parseDailyLog(dailyLog);
 
-      console.log(`[API] 开始流式生成，模型: ${config.primary.modelId}`);
+      console.log(`[API] 开始流式生成，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}`);
 
-      const result = await generateReportStream(weeklyLog, config, (chunk) => {
-        res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-      });
+      const result = await generateReportStream(
+        weeklyLog,
+        config,
+        (chunk) => {
+          res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+        },
+        {
+          customTemplate: {
+            systemPrompt: activeTemplate.systemPrompt,
+            userPromptTemplate: activeTemplate.userPromptTemplate,
+          },
+        }
+      );
 
       // 发送完成事件
       res.write(

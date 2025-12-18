@@ -33,5 +33,5 @@ export { OpenAICompatibleProvider, createProvider } from './providers/index.js';
 export { ModelManager } from './model-manager.js';
 
 // 生成器核心导出
-export type { GenerateResult } from './generator.js';
+export type { GenerateResult, GenerateOptions } from './generator.js';
 export { generateReport, generateReportStream } from './generator.js';

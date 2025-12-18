@@ -1,0 +1,93 @@
+/**
+ * 设置页面布局容器
+ * 包含左侧 Sidebar 和右侧内容区
+ */
+
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+
+// 侧边栏菜单项配置
+const MENU_ITEMS = [
+  {
+    path: '/settings/apikey-model',
+    icon: '🔑',
+    label: '模型与 API Key',
+    description: '配置 API Key 和默认模型',
+  },
+  {
+    path: '/settings/prompt',
+    icon: '📝',
+    label: 'Prompt 模板',
+    description: '管理 AI 提示词模板',
+  },
+];
+
+export default function SettingsLayout() {
+  const navigate = useNavigate();
+
+  return (
+    <div className="h-screen w-screen flex bg-[#0d1117]">
+      {/* 左侧 Sidebar */}
+      <aside className="w-64 bg-[#161b22] border-r border-[#30363d] flex flex-col shrink-0">
+        {/* 头部：返回按钮 + 标题 */}
+        <header className="h-14 flex items-center gap-3 px-4 border-b border-[#30363d]">
+          <button
+            onClick={() => navigate('/')}
+            className="text-[#8b949e] hover:text-[#f0f6fc] transition-colors"
+          >
+            ←
+          </button>
+          <h1 className="text-lg font-semibold text-[#f0f6fc]">设置</h1>
+        </header>
+
+        {/* 菜单列表 */}
+        <nav className="flex-1 p-3 space-y-1">
+          {MENU_ITEMS.map((item) => (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) => `
+                block px-3 py-3 rounded-lg transition-all duration-200
+                ${
+                  isActive
+                    ? 'bg-[#21262d] border border-[#30363d]'
+                    : 'hover:bg-[#21262d]/50'
+                }
+              `}
+            >
+              {({ isActive }) => (
+                <div className="flex items-start gap-3">
+                  <span className="text-lg">{item.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <div
+                      className={`font-medium text-sm ${
+                        isActive ? 'text-[#f0f6fc]' : 'text-[#8b949e]'
+                      }`}
+                    >
+                      {item.label}
+                    </div>
+                    <div className="text-xs text-[#484f58] mt-0.5 truncate">
+                      {item.description}
+                    </div>
+                  </div>
+                  {isActive && (
+                    <div className="w-1 h-8 bg-emerald-500 rounded-full shrink-0" />
+                  )}
+                </div>
+              )}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* 底部版本信息 */}
+        <div className="p-4 border-t border-[#30363d]">
+          <div className="text-xs text-[#484f58]">WeekNote v1.0.0</div>
+        </div>
+      </aside>
+
+      {/* 右侧内容区 */}
+      <main className="flex-1 overflow-auto">
+        <Outlet />
+      </main>
+    </div>
+  );
+}

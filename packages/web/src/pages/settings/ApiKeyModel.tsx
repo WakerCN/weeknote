@@ -1,12 +1,11 @@
 /**
- * 设置页面 - 模型管理
+ * 模型与 API Key 设置页面
  */
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useRequest } from 'ahooks';
 import { toast } from 'sonner';
-import { getModels, getConfig, saveConfig, type ModelInfo, type Platform, type AppConfig } from '../api';
+import { getModels, getConfig, saveConfig, type ModelInfo, type Platform, type AppConfig } from '../../api';
 
 // 平台信息
 const PLATFORMS: Array<{ key: Platform; name: string; url: string }> = [
@@ -15,8 +14,7 @@ const PLATFORMS: Array<{ key: Platform; name: string; url: string }> = [
   { key: 'openai', name: 'OpenAI', url: 'https://platform.openai.com/' },
 ];
 
-export default function Settings() {
-  const navigate = useNavigate();
+export default function ApiKeyModel() {
   const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
   // 编辑中的 API Keys
@@ -83,25 +81,17 @@ export default function Settings() {
 
   if (loading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-[#0d1117]">
+      <div className="h-full flex items-center justify-center">
         <div className="text-[#8b949e]">加载中...</div>
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#0d1117]">
-      {/* 顶部导航栏 */}
-      <header className="h-14 flex items-center justify-between px-6 bg-[#161b22] border-b border-[#30363d]">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate('/')}
-            className="text-[#8b949e] hover:text-[#f0f6fc] transition-colors"
-          >
-            ← 返回
-          </button>
-          <h1 className="text-lg font-semibold text-[#f0f6fc]">设置</h1>
-        </div>
+    <div className="h-full flex flex-col">
+      {/* 页面头部 */}
+      <header className="h-14 flex items-center justify-between px-6 bg-[#161b22] border-b border-[#30363d] shrink-0">
+        <h2 className="text-lg font-semibold text-[#f0f6fc]">模型与 API Key</h2>
         <button
           onClick={handleSave}
           disabled={saving}
@@ -114,16 +104,16 @@ export default function Settings() {
             }
           `}
         >
-          {saving ? '保存中...' : '💾 保存配置'}
+          {saving ? '保存中...' : '保存配置'}
         </button>
       </header>
 
       {/* 主内容区 */}
       <main className="flex-1 overflow-auto p-6">
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="max-w-3xl space-y-8">
           {/* API Keys 配置 */}
           <section className="bg-[#161b22] rounded-lg border border-[#30363d] p-6">
-            <h2 className="text-lg font-semibold text-[#f0f6fc] mb-4">🔑 API Keys</h2>
+            <h3 className="text-base font-semibold text-[#f0f6fc] mb-2">API Keys</h3>
             <p className="text-sm text-[#8b949e] mb-6">
               配置各平台的 API Key 以启用对应的模型。留空表示不修改已保存的 Key。
             </p>
@@ -134,7 +124,7 @@ export default function Settings() {
                   key={key}
                   className="flex items-center gap-4 p-4 bg-[#0d1117] rounded-lg border border-[#30363d]"
                 >
-                  <div className="w-32">
+                  <div className="w-28 shrink-0">
                     <div className="font-medium text-[#f0f6fc]">{name}</div>
                     <a
                       href={url}
@@ -158,7 +148,7 @@ export default function Settings() {
                       className="w-full px-3 py-2 bg-[#161b22] border border-[#30363d] rounded-lg text-[#f0f6fc] placeholder-[#484f58] focus:outline-none focus:border-[#58a6ff]"
                     />
                   </div>
-                  <div className="w-20 text-right">
+                  <div className="w-20 text-right shrink-0">
                     {isPlatformConfigured(key) ? (
                       <span className="text-xs text-emerald-400">✓ 已配置</span>
                     ) : (
@@ -172,14 +162,14 @@ export default function Settings() {
 
           {/* 默认模型选择 */}
           <section className="bg-[#161b22] rounded-lg border border-[#30363d] p-6">
-            <h2 className="text-lg font-semibold text-[#f0f6fc] mb-4">🤖 默认模型</h2>
+            <h3 className="text-base font-semibold text-[#f0f6fc] mb-2">默认模型</h3>
             <p className="text-sm text-[#8b949e] mb-6">
               选择生成周报时使用的默认模型。免费模型无需付费，收费模型按使用量计费。
             </p>
 
             {/* 免费模型 */}
             <div className="mb-6">
-              <h3 className="text-sm font-medium text-emerald-400 mb-3">🆓 免费模型</h3>
+              <h4 className="text-sm font-medium text-emerald-400 mb-3">免费模型</h4>
               <div className="grid gap-3">
                 {models
                   .filter((m: ModelInfo) => m.isFree)
@@ -228,7 +218,7 @@ export default function Settings() {
 
             {/* 收费模型 */}
             <div>
-              <h3 className="text-sm font-medium text-yellow-400 mb-3">💰 收费模型</h3>
+              <h4 className="text-sm font-medium text-yellow-400 mb-3">收费模型</h4>
               <div className="grid gap-3">
                 {models
                   .filter((m: ModelInfo) => !m.isFree)

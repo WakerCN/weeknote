@@ -1,9 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import Home from './pages/Home';
-import Settings from './pages/Settings';
+import SettingsLayout from './pages/settings/SettingsLayout';
+import ApiKeyModel from './pages/settings/ApiKeyModel';
+import PromptSettings from './pages/settings/PromptSettings';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -11,7 +13,13 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/settings" element={<Settings />} />
+        {/* 设置页面 - 嵌套路由 */}
+        <Route path="/settings" element={<SettingsLayout />}>
+          {/* 默认重定向到 apikey-model */}
+          <Route index element={<Navigate to="apikey-model" replace />} />
+          <Route path="apikey-model" element={<ApiKeyModel />} />
+          <Route path="prompt" element={<PromptSettings />} />
+        </Route>
       </Routes>
       {/* 全局 Toast 容器 */}
       <Toaster
