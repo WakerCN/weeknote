@@ -1,26 +1,39 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import Home from './pages/Home';
-import SettingsLayout from './pages/settings/SettingsLayout';
-import ApiKeyModel from './pages/settings/ApiKeyModel';
-import PromptSettings from './pages/settings/PromptSettings';
 import './index.css';
+
+// 路由懒加载 - 设置页面（非首屏）
+const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'));
+const ApiKeyModel = lazy(() => import('./pages/settings/ApiKeyModel'));
+const PromptSettings = lazy(() => import('./pages/settings/PromptSettings'));
+
+// 加载状态组件
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen bg-[#0d1117] flex items-center justify-center">
+      <div className="text-[#8b949e]">加载中...</div>
+    </div>
+  );
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        {/* 设置页面 - 嵌套路由 */}
-        <Route path="/settings" element={<SettingsLayout />}>
-          {/* 默认重定向到 apikey-model */}
-          <Route index element={<Navigate to="apikey-model" replace />} />
-          <Route path="apikey-model" element={<ApiKeyModel />} />
-          <Route path="prompt" element={<PromptSettings />} />
-        </Route>
-      </Routes>
+      <Suspense fallback={<LoadingFallback />}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          {/* 设置页面 - 嵌套路由（懒加载） */}
+          <Route path="/settings" element={<SettingsLayout />}>
+            {/* 默认重定向到 apikey-model */}
+            <Route index element={<Navigate to="apikey-model" replace />} />
+            <Route path="apikey-model" element={<ApiKeyModel />} />
+            <Route path="prompt" element={<PromptSettings />} />
+          </Route>
+        </Routes>
+      </Suspense>
       {/* 全局 Toast 容器 */}
       <Toaster
         theme="dark"
