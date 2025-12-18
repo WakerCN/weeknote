@@ -1,11 +1,12 @@
 /**
  * 同步滚动编辑器组件
- * 支持 Monaco Editor 和 Markdown 预览的双向同步滚动
+ * 支持 Monaco Editor 和 Markdown 预览的双向同步滚动（百分比同步）
+ * 左右编辑器+预览在同一个卡片容器内，体现关联关系
  */
 
 import { useRef, useCallback, useEffect, useMemo, type ReactNode } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import ReactMarkdown, { type Components } from 'react-markdown';
+import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { throttle } from 'lodash-es';
 
@@ -25,106 +26,6 @@ interface SyncScrollEditorProps {
 // Monaco Editor 实例类型
 type MonacoEditor = Parameters<OnMount>[0];
 
-/**
- * 创建带行号信息的 Markdown 组件
- */
-function createLineAwareComponents(content: string): Components {
-  const lines = content.split('\n');
-  let currentLineIndex = 0;
-
-  // 查找文本在源码中的行号
-  const findLineNumber = (text: string): number => {
-    if (!text) return -1;
-
-    const searchText = text.trim().slice(0, 30);
-    for (let i = currentLineIndex; i < lines.length; i++) {
-      if (lines[i].includes(searchText)) {
-        currentLineIndex = i + 1;
-        return i + 1;
-      }
-    }
-    // 如果没找到，从头找
-    for (let i = 0; i < currentLineIndex; i++) {
-      if (lines[i].includes(searchText)) {
-        return i + 1;
-      }
-    }
-    return -1;
-  };
-
-  return {
-    p: ({ children, ...props }) => {
-      const text = extractText(children);
-      const line = findLineNumber(text);
-      return (
-        <p {...props} data-source-line={line > 0 ? line : undefined}>
-          {children}
-        </p>
-      );
-    },
-    h1: ({ children, ...props }) => {
-      const text = extractText(children);
-      const line = findLineNumber(text);
-      return (
-        <h1 {...props} data-source-line={line > 0 ? line : undefined}>
-          {children}
-        </h1>
-      );
-    },
-    h2: ({ children, ...props }) => {
-      const text = extractText(children);
-      const line = findLineNumber(text);
-      return (
-        <h2 {...props} data-source-line={line > 0 ? line : undefined}>
-          {children}
-        </h2>
-      );
-    },
-    h3: ({ children, ...props }) => {
-      const text = extractText(children);
-      const line = findLineNumber(text);
-      return (
-        <h3 {...props} data-source-line={line > 0 ? line : undefined}>
-          {children}
-        </h3>
-      );
-    },
-    li: ({ children, ...props }) => {
-      const text = extractText(children);
-      const line = findLineNumber(text);
-      return (
-        <li {...props} data-source-line={line > 0 ? line : undefined}>
-          {children}
-        </li>
-      );
-    },
-    blockquote: ({ children, ...props }) => {
-      const text = extractText(children);
-      const line = findLineNumber(text);
-      return (
-        <blockquote {...props} data-source-line={line > 0 ? line : undefined}>
-          {children}
-        </blockquote>
-      );
-    },
-  };
-}
-
-/**
- * 从 React children 中提取纯文本
- */
-function extractText(children: ReactNode): string {
-  if (typeof children === 'string') return children;
-  if (typeof children === 'number') return String(children);
-  if (Array.isArray(children)) {
-    return children.map(extractText).join('');
-  }
-  if (children && typeof children === 'object' && 'props' in children) {
-    return extractText((children as { props?: { children?: ReactNode } }).props?.children);
-  }
-  return '';
-}
-
 export function SyncScrollEditor({
   value,
   onChange,
@@ -143,13 +44,7 @@ export function SyncScrollEditor({
   const isScrollingFromPreview = useRef(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  // Memoize line-aware components
-  const lineAwareComponents = useMemo(
-    () => createLineAwareComponents(value),
-    [value]
-  );
-
-  // 使用 throttle 优化编辑器滚动处理
+  // 编辑器滚动 -> 同步预览区（百分比）
   const syncPreviewScroll = useMemo(
     () =>
       throttle((editor: MonacoEditor) => {
@@ -157,42 +52,27 @@ export function SyncScrollEditor({
 
         isScrollingFromEditor.current = true;
 
-        const visibleRanges = editor.getVisibleRanges();
-        if (visibleRanges.length === 0) return;
+        // 获取编辑器滚动百分比
+        const scrollTop = editor.getScrollTop();
+        const scrollHeight = editor.getScrollHeight();
+        const clientHeight = editor.getLayoutInfo().height;
+        const maxScroll = scrollHeight - clientHeight;
 
-        const firstVisibleLine = visibleRanges[0].startLineNumber;
+        if (maxScroll <= 0) return;
 
-        // 在预览区找到对应行号的元素
-        const targetElement = previewRef.current.querySelector(
-          `[data-source-line="${firstVisibleLine}"]`
-        ) as HTMLElement;
+        const scrollPercentage = scrollTop / maxScroll;
 
-        if (targetElement) {
-          const containerRect = previewRef.current.getBoundingClientRect();
-          const elementRect = targetElement.getBoundingClientRect();
-          const offsetTop = elementRect.top - containerRect.top + previewRef.current.scrollTop;
-
-          previewRef.current.scrollTo({
-            top: Math.max(0, offsetTop - 16),
-            behavior: 'auto',
-          });
-        } else {
-          // 百分比滚动作为后备
-          const model = editor.getModel();
-          if (!model) return;
-
-          const totalLines = model.getLineCount();
-          const scrollPercentage = (firstVisibleLine - 1) / Math.max(1, totalLines - 1);
-          const maxScroll = previewRef.current.scrollHeight - previewRef.current.clientHeight;
-          previewRef.current.scrollTop = scrollPercentage * maxScroll;
-        }
+        // 同步到预览区
+        const previewMaxScroll =
+          previewRef.current.scrollHeight - previewRef.current.clientHeight;
+        previewRef.current.scrollTop = scrollPercentage * previewMaxScroll;
 
         // 延迟重置标志
         clearTimeout(scrollTimeoutRef.current);
         scrollTimeoutRef.current = setTimeout(() => {
           isScrollingFromEditor.current = false;
         }, 100);
-      }, 50),
+      }, 16), // ~60fps
     []
   );
 
@@ -205,39 +85,35 @@ export function SyncScrollEditor({
     [syncPreviewScroll]
   );
 
-  // 使用 throttle 优化预览区滚动处理
+  // 预览区滚动 -> 同步编辑器（百分比）
   const handlePreviewScroll = useMemo(
     () =>
       throttle(() => {
-        if (isScrollingFromEditor.current || !previewRef.current || !editorRef.current) return;
+        if (isScrollingFromEditor.current || !previewRef.current || !editorRef.current)
+          return;
 
         isScrollingFromPreview.current = true;
 
         const container = previewRef.current;
-        const containerRect = container.getBoundingClientRect();
+        const maxScroll = container.scrollHeight - container.clientHeight;
 
-        // 找到当前视口中第一个可见的带有行号的元素
-        const elements = container.querySelectorAll('[data-source-line]');
-        let targetLine = 1;
+        if (maxScroll <= 0) return;
 
-        for (const element of elements) {
-          const rect = element.getBoundingClientRect();
-          if (rect.top >= containerRect.top - 10 && rect.top <= containerRect.bottom) {
-            const line = parseInt(element.getAttribute('data-source-line') || '1', 10);
-            if (line > 0) {
-              targetLine = line;
-              break;
-            }
-          }
-        }
+        const scrollPercentage = container.scrollTop / maxScroll;
 
-        editorRef.current.revealLineInCenter(targetLine);
+        // 同步到编辑器
+        const editor = editorRef.current;
+        const editorScrollHeight = editor.getScrollHeight();
+        const editorClientHeight = editor.getLayoutInfo().height;
+        const editorMaxScroll = editorScrollHeight - editorClientHeight;
+
+        editor.setScrollTop(scrollPercentage * editorMaxScroll);
 
         clearTimeout(scrollTimeoutRef.current);
         scrollTimeoutRef.current = setTimeout(() => {
           isScrollingFromPreview.current = false;
         }, 100);
-      }, 50),
+      }, 16), // ~60fps
     []
   );
 
@@ -247,17 +123,17 @@ export function SyncScrollEditor({
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
       }
-      // 清理 throttle 函数
       syncPreviewScroll.cancel();
       handlePreviewScroll.cancel();
     };
   }, [syncPreviewScroll, handlePreviewScroll]);
 
   return (
-    <section className="flex-1 flex gap-3 min-h-0">
-      {/* 编辑器 */}
-      <div className="flex-1 flex flex-col bg-[#161b22] rounded-lg border border-[#30363d] overflow-hidden">
-        <div className="h-10 flex items-center px-4 border-b border-[#30363d] bg-[#21262d]">
+    <section className="flex-1 flex flex-col min-h-0 bg-[#161b22] rounded-lg border border-[#30363d] overflow-hidden">
+      {/* 统一的标题栏 */}
+      <div className="h-10 flex border-b border-[#30363d] bg-[#21262d] shrink-0">
+        {/* 左侧：编辑器标题 */}
+        <div className="w-1/2 flex items-center px-4 border-r border-[#30363d]">
           <span className="text-sm font-medium text-[#8b949e]">
             {titleIcon} {title}
           </span>
@@ -267,7 +143,27 @@ export function SyncScrollEditor({
             </span>
           )}
         </div>
-        <div className="flex-1 min-h-0">
+
+        {/* 右侧：预览标题 */}
+        <div className="w-1/2 flex items-center justify-between px-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-[#8b949e]">
+              {previewIcon} {previewTitle}
+            </span>
+            {showGenerating && (
+              <span className="text-xs text-emerald-400 animate-pulse">
+                ● 实时更新中
+              </span>
+            )}
+          </div>
+          {headerRight}
+        </div>
+      </div>
+
+      {/* 内容区：左右分栏 */}
+      <div className="flex-1 flex min-h-0">
+        {/* 左侧：编辑器 */}
+        <div className="w-1/2 min-h-0 border-r border-[#30363d]">
           <Editor
             height="100%"
             defaultLanguage="markdown"
@@ -277,7 +173,7 @@ export function SyncScrollEditor({
             onMount={handleEditorMount}
             options={{
               minimap: { enabled: false },
-              fontSize: 14,
+              fontSize: 13,
               lineNumbers: 'off',
               wordWrap: 'on',
               padding: { top: 16, bottom: 16 },
@@ -291,40 +187,25 @@ export function SyncScrollEditor({
                 horizontal: 'hidden',
                 verticalScrollbarSize: 8,
               },
+              // 禁用 Unicode 字符高亮（避免中文标点被标记为"易混淆字符"）
+              unicodeHighlight: {
+                ambiguousCharacters: false,
+                invisibleCharacters: false,
+              },
               readOnly,
             }}
           />
         </div>
-      </div>
 
-      {/* 预览 */}
-      <div className="flex-1 flex flex-col bg-[#161b22] rounded-lg border border-[#30363d] overflow-hidden">
-        <div className="h-10 flex items-center justify-between px-4 border-b border-[#30363d] bg-[#21262d]">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-[#8b949e]">
-              {previewIcon} {previewTitle}
-            </span>
-            {showGenerating && (
-              <span className="text-xs text-emerald-400 animate-pulse">
-                ● 实时更新中
-              </span>
-            )}
-          </div>
-          {headerRight}
-        </div>
+        {/* 右侧：预览 */}
         <div
           ref={previewRef}
           onScroll={handlePreviewScroll}
-          className="flex-1 overflow-auto p-4"
+          className="w-1/2 overflow-auto p-4"
         >
           {value ? (
             <div className="prose prose-invert prose-sm max-w-none">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={lineAwareComponents}
-              >
-                {value}
-              </ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{value}</ReactMarkdown>
             </div>
           ) : (
             placeholder
@@ -336,4 +217,3 @@ export function SyncScrollEditor({
 }
 
 export default SyncScrollEditor;
-
