@@ -208,7 +208,10 @@ export default function ApiKeyModel() {
 
   const models = modelsData?.models || [];
   const config: AppConfig = configData || { defaultModel: null, apiKeys: { siliconflow: null, deepseek: null, openai: null } };
-  const loading = modelsLoading || configLoading;
+  
+  // 只在首次加载（还没有任何数据）时显示全屏 loading
+  // 刷新时不显示，避免滚动位置丢失
+  const isInitialLoading = (modelsLoading || configLoading) && !modelsData && !configData;
 
   // 获取模型的平台
   const getPlatform = (modelId: string): Platform => {
@@ -263,7 +266,7 @@ export default function ApiKeyModel() {
     }
   };
 
-  if (loading) {
+  if (isInitialLoading) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-[#8b949e]">加载中...</div>

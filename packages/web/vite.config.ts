@@ -18,18 +18,20 @@ export default defineConfig({
       output: {
         // 手动分包：将大依赖拆分成独立 chunk
         manualChunks: {
+          // React 核心
           'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // Monaco Editor（最大的依赖）
           'vendor-monaco': ['@monaco-editor/react'],
+          // Markdown 渲染
           'vendor-markdown': ['react-markdown', 'remark-gfm'],
+          // UI 组件库
           'vendor-ui': [
             '@radix-ui/react-popover',
             '@radix-ui/react-select',
-            '@radix-ui/react-slot',
-            'cmdk',
             'lucide-react',
-            'sonner',
           ],
-          'vendor-utils': ['ahooks', 'axios', 'lodash-es', 'clsx', 'tailwind-merge'],
+          // 工具库
+          'vendor-utils': ['axios', 'ahooks', 'lodash-es', 'sonner'],
         },
       },
     },

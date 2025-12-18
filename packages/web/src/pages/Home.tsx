@@ -4,8 +4,8 @@
  */
 
 import { useState, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useRequest } from 'ahooks';
+import { useTransitionNavigate } from '../lib/navigation';
 import { toast } from 'sonner';
 import SyncScrollEditor from '../components/SyncScrollEditor';
 import { generateReportStream, getModels, getConfig, type ModelInfo, type Platform } from '../api';
@@ -43,7 +43,7 @@ Notes
 `;
 
 export default function Home() {
-  const navigate = useNavigate();
+  const navigate = useTransitionNavigate();
   const [dailyLog, setDailyLog] = useState(SAMPLE_DAILY_LOG);
   const [report, setReport] = useState('');
   const [modelInfo, setModelInfo] = useState<{ id: string; name: string } | null>(null);
@@ -178,7 +178,7 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-[#8b949e]">AI 周报生成器</span>
           <button
-            onClick={() => navigate('/settings')}
+            onClick={() => navigate('/settings', { scope: 'root' })}
             className="p-2 rounded-lg text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors"
             title="设置"
           >

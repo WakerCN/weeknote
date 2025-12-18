@@ -149,3 +149,56 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
+
+/* View Transitions API - 页面切换动画 */
+
+/* 设置页面右侧内容区域的过渡标识 */
+.settings-content {
+  view-transition-name: settings-content;
+}
+
+/* 默认禁用 root 过渡：避免设置页切换时 sidebar 也被模糊 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* 仅在需要时启用 root 过渡（主页 <-> 设置页面） */
+html[data-vt-root='1']::view-transition-old(root) {
+  animation: blur-fade-out 0.2s ease-out both;
+}
+
+html[data-vt-root='1']::view-transition-new(root) {
+  animation: blur-fade-in 0.2s ease-out both;
+}
+
+/* 设置内容区域：模糊 + 淡入（毛玻璃感） */
+::view-transition-old(settings-content) {
+  animation: blur-fade-out 0.2s ease-out both;
+}
+
+::view-transition-new(settings-content) {
+  animation: blur-fade-in 0.2s ease-out both;
+}
+
+@keyframes blur-fade-out {
+  from {
+    opacity: 1;
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(8px);
+  }
+}
+
+@keyframes blur-fade-in {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}

@@ -3,7 +3,8 @@
  * 包含左侧 Sidebar 和右侧内容区
  */
 
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
+import { useTransitionNavigate } from '../../lib/navigation';
 
 // 侧边栏菜单项配置
 const MENU_ITEMS = [
@@ -22,7 +23,7 @@ const MENU_ITEMS = [
 ];
 
 export default function SettingsLayout() {
-  const navigate = useNavigate();
+  const navigate = useTransitionNavigate();
 
   return (
     <div className="h-screen w-screen flex bg-[#0d1117]">
@@ -31,7 +32,7 @@ export default function SettingsLayout() {
         {/* 头部：返回按钮 + 标题 */}
         <header className="h-14 flex items-center gap-3 px-4 border-b border-[#30363d]">
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/', { scope: 'root' })}
             className="text-[#8b949e] hover:text-[#f0f6fc] transition-colors"
           >
             ←
@@ -45,12 +46,13 @@ export default function SettingsLayout() {
             <NavLink
               key={item.path}
               to={item.path}
+              viewTransition
               className={({ isActive }) => `
-                block px-3 py-3 rounded-lg transition-all duration-200
+                block px-3 py-3 rounded-lg transition-all duration-200 border
                 ${
                   isActive
-                    ? 'bg-[#21262d] border border-[#30363d]'
-                    : 'hover:bg-[#21262d]/50'
+                    ? 'bg-[#21262d] border-[#30363d]'
+                    : 'border-transparent hover:bg-[#21262d]/50'
                 }
               `}
             >
@@ -69,9 +71,11 @@ export default function SettingsLayout() {
                       {item.description}
                     </div>
                   </div>
-                  {isActive && (
-                    <div className="w-1 h-8 bg-emerald-500 rounded-full shrink-0" />
-                  )}
+                  <div
+                    className={`w-1 h-8 rounded-full shrink-0 transition-opacity duration-200 ${
+                      isActive ? 'bg-emerald-500 opacity-100' : 'opacity-0'
+                    }`}
+                  />
                 </div>
               )}
             </NavLink>
@@ -86,7 +90,9 @@ export default function SettingsLayout() {
 
       {/* 右侧内容区 */}
       <main className="flex-1 overflow-auto">
-        <Outlet />
+        <div className="settings-content h-full">
+          <Outlet />
+        </div>
       </main>
     </div>
   );
