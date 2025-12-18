@@ -114,12 +114,17 @@ export function createServer(): Express {
   app.get('/api/config', (_req, res) => {
     const config = loadConfig();
 
+    // 返回完整的 API Key（本地工具，安全风险较低）
+    const siliconflowKey = config.apiKeys?.siliconflow || process.env.SILICONFLOW_API_KEY || null;
+    const deepseekKey = config.apiKeys?.deepseek || process.env.DEEPSEEK_API_KEY || null;
+    const openaiKey = config.apiKeys?.openai || process.env.OPENAI_API_KEY || null;
+
     res.json({
       defaultModel: config.defaultModel || DEFAULT_MODEL,
       apiKeys: {
-        siliconflow: !!config.apiKeys?.siliconflow || !!process.env.SILICONFLOW_API_KEY,
-        deepseek: !!config.apiKeys?.deepseek || !!process.env.DEEPSEEK_API_KEY,
-        openai: !!config.apiKeys?.openai || !!process.env.OPENAI_API_KEY,
+        siliconflow: siliconflowKey,
+        deepseek: deepseekKey,
+        openai: openaiKey,
       },
     });
   });
@@ -157,6 +162,35 @@ export function createServer(): Express {
       console.error('[API] 保存配置失败:', error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '保存配置失败',
+      });
+    }
+  });
+
+  // 删除 API Key
+  app.delete('/api/config/apikey/:platform', (req, res) => {
+    try {
+      const { platform } = req.params;
+
+      if (!['siliconflow', 'deepseek', 'openai'].includes(platform)) {
+        return res.status(400).json({ error: '无效的平台' });
+      }
+
+      const currentConfig = loadConfig();
+
+      // 删除指定平台的 API Key
+      if (currentConfig.apiKeys) {
+        delete currentConfig.apiKeys[platform as 'siliconflow' | 'deepseek' | 'openai'];
+      }
+
+      saveConfig(currentConfig);
+
+      console.log(`[API] 已删除 ${platform} API Key`);
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('[API] 删除 API Key 失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '删除失败',
       });
     }
   });

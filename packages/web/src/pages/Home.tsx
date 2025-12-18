@@ -72,12 +72,12 @@ export default function Home() {
   // 将模型列表转换为 Combobox 选项格式
   const modelOptions: ComboboxOption[] = useMemo(() => {
     const models = modelsData?.models || [];
-    const apiKeys: Record<Platform, boolean> = configData?.apiKeys || { siliconflow: false, deepseek: false, openai: false };
+    const apiKeys = configData?.apiKeys || { siliconflow: null, deepseek: null, openai: null };
     const defaultModel = configData?.defaultModel;
 
     return models.map((model: ModelInfo) => {
       const platform = getPlatform(model.id);
-      const isConfigured = apiKeys[platform];
+      const isConfigured = !!apiKeys[platform];
       const isDefault = model.id === defaultModel;
 
       // 构建标签

@@ -18,7 +18,7 @@ export type Platform = 'siliconflow' | 'deepseek' | 'openai';
 // 配置类型
 export interface AppConfig {
   defaultModel: string | null;
-  apiKeys: Record<Platform, boolean>; // 是否已配置
+  apiKeys: Record<Platform, string | null>; // 脱敏的 API Key 或 null（未配置）
 }
 
 // 保存配置的参数
@@ -101,6 +101,12 @@ export const getConfig = () => api.get<unknown, AppConfig>('/config');
  */
 export const saveConfig = (params: SaveConfigParams) =>
   api.post<unknown, { success: boolean }>('/config', params);
+
+/**
+ * 删除 API Key
+ */
+export const deleteApiKey = (platform: Platform) =>
+  api.delete<unknown, { success: boolean }>(`/config/apikey/${platform}`);
 
 /**
  * 生成周报（非流式）
