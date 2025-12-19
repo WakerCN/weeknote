@@ -11,15 +11,25 @@ import remarkGfm from 'remark-gfm';
 import { throttle } from 'lodash-es';
 
 interface SyncScrollEditorProps {
+  /** 编辑器内容 */
   value: string;
+  /** 内容变更回调 */
   onChange?: (value: string) => void;
+  /** 是否只读模式 */
   readOnly?: boolean;
+  /** 编辑器标题 */
   title: string;
+  /** 编辑器标题图标 */
   titleIcon: string;
+  /** 预览区标题 */
   previewTitle: string;
+  /** 预览区标题图标 */
   previewIcon: string;
+  /** 内容为空时显示的占位内容 */
   placeholder?: ReactNode;
+  /** 标题栏右侧自定义内容 */
   headerRight?: ReactNode;
+  /** 是否显示生成中状态 */
   showGenerating?: boolean;
 }
 
