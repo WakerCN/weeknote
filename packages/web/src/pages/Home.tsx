@@ -7,7 +7,9 @@ import { useState, useRef, useMemo } from 'react';
 import { useRequest } from 'ahooks';
 import { useTransitionNavigate } from '../lib/navigation';
 import { toast } from 'sonner';
+import { FileText } from 'lucide-react';
 import SyncScrollEditor from '../components/SyncScrollEditor';
+import PromptPanel from '../components/PromptPanel';
 import { generateReportStream, getModels, getConfig, type ModelInfo, type Platform } from '../api';
 import { Combobox, type ComboboxOption, type ComboboxTag } from '@/components/ui/combobox';
 
@@ -48,6 +50,7 @@ export default function Home() {
   const [report, setReport] = useState('');
   const [modelInfo, setModelInfo] = useState<{ id: string; name: string } | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
+  const [showPromptPanel, setShowPromptPanel] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // 加载模型列表
@@ -226,6 +229,16 @@ export default function Home() {
             className="w-[280px]"
           />
 
+          {/* 查看 Prompt 按钮 */}
+          <button
+            onClick={() => setShowPromptPanel(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm bg-[#21262d] text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#30363d] transition-all duration-200 border border-[#30363d]"
+            title="查看完整 Prompt"
+          >
+            <FileText className="w-4 h-4" />
+            查看 Prompt
+          </button>
+
           {/* 生成/取消按钮 */}
           {isGenerating ? (
             <button
@@ -312,6 +325,9 @@ export default function Home() {
           }
         />
       </main>
+
+      {/* Prompt 预览侧边面板 */}
+      <PromptPanel open={showPromptPanel} onClose={() => setShowPromptPanel(false)} dailyLog={dailyLog} />
     </div>
   );
 }
