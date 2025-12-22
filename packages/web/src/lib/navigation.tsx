@@ -27,7 +27,7 @@ function enableRootTransitionTemporarily() {
 
 /**
  * 带过渡效果的 navigate hook
- * 
+ *
  * @example
  * const navigate = useTransitionNavigate();
  * navigate('/settings');
@@ -56,7 +56,7 @@ export function useTransitionNavigate() {
 
 /**
  * 带过渡效果的 Link 组件
- * 
+ *
  * @example
  * <TransitionLink to="/settings">设置</TransitionLink>
  */
@@ -81,4 +81,3 @@ export function TransitionLink(
     />
   );
 }
-
