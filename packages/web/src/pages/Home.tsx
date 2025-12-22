@@ -14,34 +14,65 @@ import { generateReportStream, getModels, getConfig, type ModelInfo, type Platfo
 import { Combobox, type ComboboxOption, type ComboboxTag } from '@/components/ui/combobox';
 
 // 示例 Daily Log
-const SAMPLE_DAILY_LOG = `12-09 | 周一
+const SAMPLE_DAILY_LOG = `12-15 | 周一
 Plan
-[ ] 完成用户认证模块开发
-[ ] 评审设计文档
+[ ] ems
+  [ ]  峰谷电价图开发
+[ ] hb-yuque-desensiter
+Result
+● ems
+  ○ 完成峰谷电价组件封装
+● 初步完成 hb-yuque-desensiter 项目
+  ○ storage，core，yuque-api,cli,ui 五个包的开发
+Issues
+md 格式导出语雀无法自动同步分栏组件样式
+Notes
+
+12-16 | 周二
+Plan
+[ ] 国际化组件接入规划
+[ ] 【商户】免套餐功能新增审核字段开发
+ Result
+● 整理文档
+● 免套餐功能新增审核字段完成静态开发
+● 完成周报工具 weeknote 初版开发
+Issues
+● 发现同步内外网语雀存在合规性问题
+Notes
+
+12-17 | 周三
+Plan
+[X] 测试优化 weeknote 工具
+[ ] 国际化组件封装
 
 Result
-● 完成了用户认证模块的 80%
-● 设计文档评审完成，有 3 处需要修改
+● 魔方
+  ○ 商品组件定位失败兜底开发
+  ○ 调整增加 activitySource
+ Issues
 
-Issues
-● 后端接口文档不清晰，需要和后端同步
+ Notes
 
-Notes
-● 下午有项目周会
-
-12-10 | 周二
+12-18 | 周四
 Plan
-[ ] 继续完成用户认证模块
-[ ] 修复昨天评审发现的问题
 
-Result
-● 用户认证模块完成
-● 设计文档修改完成并通过二次评审
-
+ Result
+● 输出小哈能源出海方案
+  ○ 
 Issues
 
 Notes
-● 团队新人入职
+
+12-19 | 周五
+Plan
+[ ] ems 功能梳理
+[ ] 商户，免套餐功能对接
+Result
+● ems 峰谷电价图接口数据 mock 与对接
+● 电价 2 期，能源小程序需求评审
+Issues
+● 小程序下载，图片压缩目 demo
+Notes
 `;
 
 export default function Home() {
