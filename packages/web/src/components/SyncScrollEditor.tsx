@@ -4,7 +4,7 @@
  * 左右编辑器+预览在同一个卡片容器内，体现关联关系
  */
 
-import { useRef, useCallback, useEffect, useMemo, type ReactNode } from 'react';
+import { useRef, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -54,6 +54,79 @@ export function SyncScrollEditor({
   const isScrollingFromPreview = useRef(false);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
+  // 自动滚动控制：用户手动滚动时暂停自动滚动
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
+  const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // 当开始生成时，重新启用自动滚动
+  useEffect(() => {
+    if (showGenerating) {
+      setAutoScrollEnabled(true);
+    }
+  }, [showGenerating]);
+
+  // 流式生成时自动滚动到底部
+  useEffect(() => {
+    if (!showGenerating || !autoScrollEnabled) return;
+
+    // 滚动编辑器到底部
+    if (editorRef.current) {
+      const editor = editorRef.current;
+      // 使用 requestAnimationFrame 确保在内容更新后滚动
+      requestAnimationFrame(() => {
+        const scrollHeight = editor.getScrollHeight();
+        editor.setScrollTop(scrollHeight);
+      });
+    }
+
+    // 滚动预览区到底部
+    if (previewRef.current) {
+      requestAnimationFrame(() => {
+        if (previewRef.current) {
+          previewRef.current.scrollTop = previewRef.current.scrollHeight;
+        }
+      });
+    }
+  }, [value, showGenerating, autoScrollEnabled]);
+
+  // 检测用户手动滚动（向上滚动时暂停自动滚动）
+  const handleUserScroll = useCallback(
+    (container: HTMLElement | MonacoEditor, type: 'editor' | 'preview') => {
+      if (!showGenerating) return;
+
+      // 获取滚动位置信息
+      let scrollTop: number;
+      let scrollHeight: number;
+      let clientHeight: number;
+
+      if (type === 'editor') {
+        const editor = container as MonacoEditor;
+        scrollTop = editor.getScrollTop();
+        scrollHeight = editor.getScrollHeight();
+        clientHeight = editor.getLayoutInfo().height;
+      } else {
+        const elem = container as HTMLElement;
+        scrollTop = elem.scrollTop;
+        scrollHeight = elem.scrollHeight;
+        clientHeight = elem.clientHeight;
+      }
+
+      const maxScroll = scrollHeight - clientHeight;
+      const isNearBottom = maxScroll - scrollTop < 50; // 距离底部 50px 以内
+
+      // 如果用户向上滚动（不在底部附近），暂停自动滚动
+      if (!isNearBottom && autoScrollEnabled) {
+        setAutoScrollEnabled(false);
+      }
+
+      // 如果用户滚动回底部，重新启用自动滚动
+      if (isNearBottom && !autoScrollEnabled) {
+        setAutoScrollEnabled(true);
+      }
+    },
+    [showGenerating, autoScrollEnabled]
+  );
+
   // 编辑器滚动 -> 同步预览区（百分比）
   const syncPreviewScroll = useMemo(
     () =>
@@ -90,17 +163,25 @@ export function SyncScrollEditor({
   const handleEditorMount: OnMount = useCallback(
     (editor) => {
       editorRef.current = editor;
-      editor.onDidScrollChange(() => syncPreviewScroll(editor));
+      editor.onDidScrollChange(() => {
+        syncPreviewScroll(editor);
+        // 检测用户手动滚动
+        handleUserScroll(editor, 'editor');
+      });
     },
-    [syncPreviewScroll]
+    [syncPreviewScroll, handleUserScroll]
   );
 
   // 预览区滚动 -> 同步编辑器（百分比）
   const handlePreviewScroll = useMemo(
     () =>
       throttle(() => {
-        if (isScrollingFromEditor.current || !previewRef.current || !editorRef.current)
-          return;
+        if (!previewRef.current || !editorRef.current) return;
+
+        // 检测用户手动滚动
+        handleUserScroll(previewRef.current, 'preview');
+
+        if (isScrollingFromEditor.current) return;
 
         isScrollingFromPreview.current = true;
 
@@ -124,7 +205,7 @@ export function SyncScrollEditor({
           isScrollingFromPreview.current = false;
         }, 100);
       }, 16), // ~60fps
-    []
+    [handleUserScroll]
   );
 
   // 清理
@@ -132,6 +213,9 @@ export function SyncScrollEditor({
     return () => {
       if (scrollTimeoutRef.current) {
         clearTimeout(scrollTimeoutRef.current);
+      }
+      if (userScrollTimeoutRef.current) {
+        clearTimeout(userScrollTimeoutRef.current);
       }
       syncPreviewScroll.cancel();
       handlePreviewScroll.cancel();
