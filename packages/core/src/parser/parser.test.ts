@@ -95,15 +95,22 @@ describe('parseDailyLog', () => {
   it('应该处理空输入', () => {
     const result = parseDailyLog('');
 
-    expect(result.entries).toHaveLength(0);
+    // 空输入也会创建一个条目（无日期行分支）
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].date).toBe('未标注');
+    expect(result.entries[0].result).toHaveLength(0);
     expect(result.startDate).toBe('');
     expect(result.endDate).toBe('');
   });
 
-  it('应该处理没有日期行的输入', () => {
+  it('应该处理没有日期行的输入（整体作为一个条目）', () => {
     const result = parseDailyLog('一些随机文本\n没有日期行');
 
-    expect(result.entries).toHaveLength(0);
+    // 没有日期行时，整体作为一个条目，内容放入 result
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].date).toBe('未标注');
+    expect(result.entries[0].result).toContain('一些随机文本');
+    expect(result.entries[0].result).toContain('没有日期行');
   });
 
   it('应该保留原始内容', () => {
@@ -115,25 +122,40 @@ describe('parseDailyLog', () => {
 });
 
 describe('validateDailyLog', () => {
-  it('对于正确格式应该返回有效', () => {
+  it('对于正确格式应该返回 valid 状态', () => {
     const result = validateDailyLog(SAMPLE_DAILY_LOG);
 
-    expect(result.valid).toBe(true);
+    expect(result.status).toBe('valid');
+    expect(result.warnings).toHaveLength(0);
     expect(result.error).toBeUndefined();
   });
 
-  it('对于空输入应该返回无效', () => {
+  it('对于空输入应该返回 error 状态', () => {
     const result = validateDailyLog('');
 
-    expect(result.valid).toBe(false);
-    expect(result.error).toBe('输入内容为空');
+    expect(result.status).toBe('error');
+    expect(result.error).toBe('请输入 Daily Log 内容');
   });
 
-  it('对于没有日期行的输入应该返回无效', () => {
+  it('对于没有日期行的输入应该返回 warning 状态（软校验）', () => {
     const result = validateDailyLog('一些随机文本');
 
-    expect(result.valid).toBe(false);
-    expect(result.error).toContain('未找到有效的日期行');
+    expect(result.status).toBe('warning');
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings.some((w) => w.type === 'no_date_line')).toBe(true);
+  });
+
+  it('对于没有段落结构的输入应该返回 warning', () => {
+    const result = validateDailyLog('12-23 | 周一\n完成了一些工作');
+
+    expect(result.status).toBe('warning');
+    expect(result.warnings.some((w) => w.type === 'no_sections')).toBe(true);
+  });
+
+  it('对于有日期行和段落结构但缺少一些段落的输入应该返回 valid', () => {
+    const result = validateDailyLog('12-23 | 周一\nPlan\n- 计划任务');
+
+    expect(result.status).toBe('valid');
   });
 });
 
