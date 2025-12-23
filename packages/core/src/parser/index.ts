@@ -29,12 +29,153 @@ const LIST_ITEM_PATTERN = /^[-*•]\s*(.+)$/;
 type SectionType = 'plan' | 'result' | 'issues' | 'notes';
 
 /**
+ * 校验状态
+ */
+export type ValidationStatus = 'valid' | 'warning' | 'error';
+
+/**
+ * 校验警告类型
+ */
+export type ValidationWarningType = 'no_date_line' | 'no_sections';
+
+/**
+ * 校验警告信息
+ */
+export interface ValidationWarning {
+  type: ValidationWarningType;
+  message: string;
+  suggestion: string;
+}
+
+/**
+ * 校验结果
+ */
+export interface ValidationResult {
+  status: ValidationStatus;
+  warnings: ValidationWarning[];
+  error?: string;
+}
+
+/**
+ * 警告消息配置
+ */
+const WARNING_MESSAGES: Record<ValidationWarningType, { message: string; suggestion: string }> = {
+  no_date_line: {
+    message: '未找到日期标识',
+    suggestion: `按天记录可以让 AI 更好地理解工作进度。推荐格式：
+
+  12-23 | 周一
+  Plan
+  - 计划任务 1
+  Result
+  - 完成内容 1
+
+当前将整体作为一天的内容处理。`,
+  },
+  no_sections: {
+    message: '未找到段落结构',
+    suggestion: `使用 Plan / Result / Issues / Notes 分类，可以让周报更有条理：
+
+  Plan
+  - 今日计划
+  Result
+  - 实际完成
+  Issues
+  - 遇到的问题
+
+当前将所有内容作为 Result 处理。`,
+  },
+};
+
+/**
+ * 解析段落内容（无日期行时使用）
+ * @param rawText - 原始文本
+ * @returns 解析后的段落内容
+ */
+function parseSections(rawText: string): Pick<DailyLogEntry, 'plan' | 'result' | 'issues' | 'notes'> {
+  const result: Pick<DailyLogEntry, 'plan' | 'result' | 'issues' | 'notes'> = {
+    plan: [],
+    result: [],
+    issues: [],
+    notes: [],
+  };
+
+  const lines = rawText.split('\n');
+  let currentSection: SectionType | null = null;
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+
+    // 检查段落标题
+    const sectionMatch = trimmedLine.match(SECTION_PATTERN);
+    if (sectionMatch) {
+      currentSection = sectionMatch[1].toLowerCase() as SectionType;
+      continue;
+    }
+
+    // 跳过空行
+    if (!trimmedLine) {
+      continue;
+    }
+
+    // 将内容添加到当前段落
+    if (currentSection) {
+      const listMatch = trimmedLine.match(LIST_ITEM_PATTERN);
+      if (listMatch) {
+        result[currentSection].push(listMatch[1].trim());
+      } else {
+        result[currentSection].push(trimmedLine);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
  * 解析原始 Daily Log 文本为结构化的周日志
  * @param rawText - 原始 Daily Log 文本
  * @returns 解析后的周日志
  */
 export function parseDailyLog(rawText: string): WeeklyLog {
   const lines = rawText.split('\n');
+
+  // 检查是否有日期行
+  const hasDateLine = lines.some((line) => DATE_LINE_PATTERN.test(line.trim()));
+
+  // 无日期行：整体作为一个条目处理
+  if (!hasDateLine) {
+    const hasSections = lines.some((line) => SECTION_PATTERN.test(line.trim()));
+
+    const entry: DailyLogEntry = {
+      date: '未标注',
+      dayOfWeek: '',
+      plan: [],
+      result: [],
+      issues: [],
+      notes: [],
+      rawContent: rawText,
+    };
+
+    if (hasSections) {
+      // 有段落结构，按段落解析
+      const sections = parseSections(rawText);
+      entry.plan = sections.plan;
+      entry.result = sections.result;
+      entry.issues = sections.issues;
+      entry.notes = sections.notes;
+    } else {
+      // 无段落结构，全部放入 result
+      entry.result = rawText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+    }
+
+    return { entries: [entry], startDate: '', endDate: '' };
+  }
+
+  // 有日期行：正常解析
   const entries: DailyLogEntry[] = [];
 
   let currentEntry: DailyLogEntry | null = null;
@@ -170,33 +311,41 @@ export function parseDayEntry(dayText: string, dateHeader: string): DailyLogEntr
 }
 
 /**
- * 验证输入文本是否为有效的 Daily Log 格式
+ * 验证输入文本是否为有效的 Daily Log 格式（软校验）
  * @param rawText - 要验证的原始文本
- * @returns 验证结果，如果无效则包含错误信息
+ * @returns 验证结果，包含状态、警告信息或错误信息
  */
-export function validateDailyLog(rawText: string): { valid: boolean; error?: string } {
-  if (!rawText || !rawText.trim()) {
-    return { valid: false, error: '输入内容为空' };
+export function validateDailyLog(rawText: string): ValidationResult {
+  // 严重错误：输入为空
+  if (!rawText?.trim()) {
+    return { status: 'error', warnings: [], error: '请输入 Daily Log 内容' };
   }
 
+  const warnings: ValidationWarning[] = [];
   const lines = rawText.split('\n');
-  let hasDateLine = false;
 
-  for (const line of lines) {
-    if (DATE_LINE_PATTERN.test(line.trim())) {
-      hasDateLine = true;
-      break;
-    }
-  }
-
+  // 检查是否有日期行
+  const hasDateLine = lines.some((line) => DATE_LINE_PATTERN.test(line.trim()));
   if (!hasDateLine) {
-    return {
-      valid: false,
-      error: '未找到有效的日期行，请使用格式：12-15 | 周一',
-    };
+    warnings.push({
+      type: 'no_date_line',
+      ...WARNING_MESSAGES.no_date_line,
+    });
   }
 
-  return { valid: true };
+  // 检查是否有段落结构
+  const hasSections = lines.some((line) => SECTION_PATTERN.test(line.trim()));
+  if (!hasSections) {
+    warnings.push({
+      type: 'no_sections',
+      ...WARNING_MESSAGES.no_sections,
+    });
+  }
+
+  return {
+    status: warnings.length > 0 ? 'warning' : 'valid',
+    warnings,
+  };
 }
 
 /**
