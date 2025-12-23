@@ -27,10 +27,20 @@ export interface SaveConfigParams {
   apiKeys?: Partial<Record<Platform, string>>;
 }
 
+// 校验警告类型
+export type ValidationWarningType = 'no_date_line' | 'no_sections';
+
+export interface ValidationWarning {
+  type: ValidationWarningType;
+  message: string;
+  suggestion: string;
+}
+
 // 生成结果
 export interface GenerateResult {
   report: string;
   model: { id: string; name: string };
+  warnings?: ValidationWarning[];
 }
 
 // Prompt 模板类型
@@ -114,20 +124,26 @@ export const deleteApiKey = (platform: Platform) =>
 export const generateReport = (dailyLog: string, modelId?: string) =>
   api.post<unknown, GenerateResult>('/generate', { dailyLog, modelId });
 
+// 流式生成结果
+export interface GenerateStreamResult {
+  model: { id: string; name: string };
+  warnings?: ValidationWarning[];
+}
+
 /**
  * 流式生成周报
  * @param dailyLog 日志内容
  * @param onChunk 每个 chunk 的回调
  * @param signal AbortController signal
  * @param modelId 可选的模型 ID
- * @returns 最终结果
+ * @returns 最终结果（包含模型信息和可能的警告）
  */
 export async function generateReportStream(
   dailyLog: string,
   onChunk: (chunk: string) => void,
   signal?: AbortSignal,
   modelId?: string
-): Promise<{ model: { id: string; name: string } }> {
+): Promise<GenerateStreamResult> {
   const response = await fetch('/api/generate/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -147,7 +163,7 @@ export async function generateReportStream(
 
   const decoder = new TextDecoder();
   let buffer = '';
-  let result: { model: { id: string; name: string } } | null = null;
+  let result: GenerateStreamResult | null = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -169,7 +185,10 @@ export async function generateReportStream(
           }
 
           if (data.done) {
-            result = { model: data.model };
+            result = {
+              model: data.model,
+              warnings: data.warnings,
+            };
           }
 
           if (data.error) {

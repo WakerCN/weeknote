@@ -10,7 +10,14 @@ import { toast } from 'sonner';
 import { FileText } from 'lucide-react';
 import SyncScrollEditor from '../components/SyncScrollEditor';
 import PromptPanel from '../components/PromptPanel';
-import { generateReportStream, getModels, getConfig, type ModelInfo, type Platform } from '../api';
+import {
+  generateReportStream,
+  getModels,
+  getConfig,
+  type ModelInfo,
+  type Platform,
+  type ValidationWarning,
+} from '../api';
 import { Combobox, type ComboboxOption, type ComboboxTag } from '@/components/ui/combobox';
 
 // 示例 Daily Log
@@ -138,6 +145,31 @@ export default function Home() {
     });
   }, [modelsData?.models, configData?.apiKeys, configData?.defaultModel]);
 
+  /**
+   * 显示格式警告的友好提示
+   */
+  const showFormatWarnings = (warnings: ValidationWarning[]) => {
+    const hasNoDate = warnings.some((w) => w.type === 'no_date_line');
+    const hasNoSections = warnings.some((w) => w.type === 'no_sections');
+
+    let description = '';
+
+    if (hasNoDate && hasNoSections) {
+      description = '添加日期行（如 12-23 | 周一）和段落结构（Plan/Result/Issues/Notes）可获得更好的生成效果';
+    } else if (hasNoDate) {
+      description = '添加日期行（如 12-23 | 周一）可让 AI 更好地按天整理工作';
+    } else if (hasNoSections) {
+      description = '使用 Plan/Result/Issues/Notes 段落结构可让周报更有条理';
+    }
+
+    if (description) {
+      toast.warning('💡 格式提示', {
+        description,
+        duration: 6000,
+      });
+    }
+  };
+
   // 使用 useRequest 管理生成状态
   const {
     loading: isGenerating,
@@ -167,6 +199,12 @@ export default function Home() {
 
       setModelInfo(result.model);
       abortControllerRef.current = null;
+
+      // 显示格式警告（如果有）
+      if (result.warnings?.length) {
+        showFormatWarnings(result.warnings);
+      }
+
       return result;
     },
     {
