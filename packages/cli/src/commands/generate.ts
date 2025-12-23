@@ -80,11 +80,22 @@ export async function runGenerate(options: GenerateOptions): Promise<void> {
       }
     }
 
-    // 2. 验证输入
+    // 2. 验证输入（软校验）
     const validation = validateDailyLog(input);
-    if (!validation.valid) {
+    if (validation.status === 'error') {
       console.error(chalk.red(`❌ ${validation.error}`));
       process.exit(1);
+    }
+
+    // 显示格式警告（但继续生成）
+    if (validation.status === 'warning' && validation.warnings.length > 0) {
+      console.log(chalk.yellow('\n💡 格式提示\n'));
+      validation.warnings.forEach((w) => {
+        console.log(chalk.yellow(`⚠️  ${w.message}`));
+        const suggestionLines = w.suggestion.split('\n').map((l) => `   ${l}`);
+        console.log(chalk.gray(suggestionLines.join('\n')));
+        console.log('');
+      });
     }
 
     // 3. 解析 Daily Log
