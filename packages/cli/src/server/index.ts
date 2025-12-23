@@ -17,6 +17,7 @@ import {
   DEFAULT_MODEL,
   isValidModelId,
   type ModelId,
+  type ValidationWarning,
 } from '@weeknote/core';
 import {
   loadConfig,
@@ -343,11 +344,14 @@ export function createServer(): Express {
         return res.status(400).json({ error: 'Daily Log 内容不能为空' });
       }
 
-      // 验证输入格式
+      // 验证输入格式（软校验）
       const validation = validateDailyLog(dailyLog);
-      if (!validation.valid) {
+      if (validation.status === 'error') {
         return res.status(400).json({ error: validation.error });
       }
+
+      // 收集警告信息
+      const warnings: ValidationWarning[] = validation.warnings || [];
 
       // 获取配置
       const config = getApiConfig(modelId);
@@ -361,6 +365,9 @@ export function createServer(): Express {
       const activeTemplate = getActiveTemplate();
 
       console.log(`[API] 开始生成周报，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}`);
+      if (warnings.length > 0) {
+        console.log(`[API] 格式警告: ${warnings.map((w) => w.type).join(', ')}`);
+      }
 
       // 解析 Daily Log
       const weeklyLog = parseDailyLog(dailyLog);
@@ -379,6 +386,7 @@ export function createServer(): Express {
       res.json({
         success: true,
         report: result.report.rawMarkdown,
+        warnings: warnings.length > 0 ? warnings : undefined,
         model: {
           id: result.modelId,
           name: result.modelName,
@@ -401,10 +409,14 @@ export function createServer(): Express {
         return res.status(400).json({ error: 'Daily Log 内容不能为空' });
       }
 
+      // 验证输入格式（软校验）
       const validation = validateDailyLog(dailyLog);
-      if (!validation.valid) {
+      if (validation.status === 'error') {
         return res.status(400).json({ error: validation.error });
       }
+
+      // 收集警告信息
+      const warnings: ValidationWarning[] = validation.warnings || [];
 
       const config = getApiConfig(modelId);
       if (!config) {
@@ -424,6 +436,9 @@ export function createServer(): Express {
       const weeklyLog = parseDailyLog(dailyLog);
 
       console.log(`[API] 开始流式生成，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}`);
+      if (warnings.length > 0) {
+        console.log(`[API] 格式警告: ${warnings.map((w) => w.type).join(', ')}`);
+      }
 
       const result = await generateReportStream(
         weeklyLog,
@@ -439,10 +454,11 @@ export function createServer(): Express {
         }
       );
 
-      // 发送完成事件
+      // 发送完成事件（包含警告信息）
       res.write(
         `data: ${JSON.stringify({
           done: true,
+          warnings: warnings.length > 0 ? warnings : undefined,
           model: { id: result.modelId, name: result.modelName },
         })}\n\n`
       );
