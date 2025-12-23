@@ -101,7 +101,8 @@ function parseSections(rawText: string): Pick<DailyLogEntry, 'plan' | 'result' |
   };
 
   const lines = rawText.split('\n');
-  let currentSection: SectionType | null = null;
+  // 段落标题之前的内容默认放入 result（避免静默丢弃）
+  let currentSection: SectionType = 'result';
 
   for (const line of lines) {
     const trimmedLine = line.trim();
@@ -119,13 +120,11 @@ function parseSections(rawText: string): Pick<DailyLogEntry, 'plan' | 'result' |
     }
 
     // 将内容添加到当前段落
-    if (currentSection) {
-      const listMatch = trimmedLine.match(LIST_ITEM_PATTERN);
-      if (listMatch) {
-        result[currentSection].push(listMatch[1].trim());
-      } else {
-        result[currentSection].push(trimmedLine);
-      }
+    const listMatch = trimmedLine.match(LIST_ITEM_PATTERN);
+    if (listMatch) {
+      result[currentSection].push(listMatch[1].trim());
+    } else {
+      result[currentSection].push(trimmedLine);
     }
   }
 

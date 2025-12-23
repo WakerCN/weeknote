@@ -113,6 +113,28 @@ describe('parseDailyLog', () => {
     expect(result.entries[0].result).toContain('没有日期行');
   });
 
+  it('应该保留段落标题之前的内容（不静默丢弃）', () => {
+    const input = `这是介绍性文字
+另一行前置内容
+
+Plan
+- 计划任务 1
+
+Result
+- 完成内容 1`;
+
+    const result = parseDailyLog(input);
+
+    expect(result.entries).toHaveLength(1);
+    expect(result.entries[0].date).toBe('未标注');
+    // 段落标题之前的内容应该放入 result
+    expect(result.entries[0].result).toContain('这是介绍性文字');
+    expect(result.entries[0].result).toContain('另一行前置内容');
+    expect(result.entries[0].result).toContain('完成内容 1');
+    // Plan 段落正常解析
+    expect(result.entries[0].plan).toContain('计划任务 1');
+  });
+
   it('应该保留原始内容', () => {
     const result = parseDailyLog(SAMPLE_DAILY_LOG);
 
