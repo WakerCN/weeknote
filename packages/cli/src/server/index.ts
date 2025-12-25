@@ -35,6 +35,7 @@ import {
   DEFAULT_SYSTEM_PROMPT,
   DEFAULT_USER_PROMPT_TEMPLATE,
 } from '../prompt-config.js';
+import dailyLogsRouter from './daily-logs.js';
 import type { Express } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -483,6 +484,9 @@ export function createServer(): Express {
       }
     }
   });
+
+  // 每日记录 API
+  app.use('/api/daily-logs', dailyLogsRouter);
 
   // SPA 路由回退 - 所有非 API 路由返回 index.html
   app.get('*', (_req, res) => {
