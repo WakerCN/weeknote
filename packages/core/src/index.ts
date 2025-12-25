@@ -14,3 +14,6 @@ export * from './generator/index.js';
 
 // 类型定义
 export * from './types/index.js';
+
+// 每日记录模块
+export * from './daily-log/index.js';
