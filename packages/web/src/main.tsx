@@ -9,6 +9,7 @@ import './index.css';
 const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'));
 const ApiKeyModel = lazy(() => import('./pages/settings/ApiKeyModel'));
 const PromptSettings = lazy(() => import('./pages/settings/PromptSettings'));
+const DailyLog = lazy(() => import('./pages/DailyLog'));
 
 // 加载中占位组件
 function LoadingFallback() {
@@ -24,6 +25,22 @@ const router = createBrowserRouter([
   {
     path: '/',
     element: <Home />,
+  },
+  {
+    path: '/daily',
+    element: (
+      <Suspense fallback={<LoadingFallback />}>
+        <DailyLog />
+      </Suspense>
+    ),
+  },
+  {
+    path: '/daily/:date',
+    element: (
+      <Suspense fallback={<LoadingFallback />}>
+        <DailyLog />
+      </Suspense>
+    ),
   },
   {
     path: '/settings',
