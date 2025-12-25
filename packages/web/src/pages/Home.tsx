@@ -3,17 +3,18 @@
  * 主页面组件
  */
 
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { useRequest } from 'ahooks';
 import { useTransitionNavigate } from '../lib/navigation';
 import { toast } from 'sonner';
-import { FileText } from 'lucide-react';
+import { FileText, Calendar } from 'lucide-react';
 import SyncScrollEditor from '../components/SyncScrollEditor';
 import PromptPanel from '../components/PromptPanel';
 import {
   generateReportStream,
   getModels,
   getConfig,
+  exportWeek,
   type ModelInfo,
   type Platform,
   type ValidationWarning,
@@ -90,6 +91,34 @@ export default function Home() {
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [showPromptPanel, setShowPromptPanel] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // 检查是否有从每日记录页导入的数据
+  useEffect(() => {
+    const state = (window.history.state as { dailyLog?: string }) || {};
+    if (state.dailyLog) {
+      setDailyLog(state.dailyLog);
+      // 清除state，避免刷新时重复导入
+      window.history.replaceState({}, '');
+    }
+  }, []);
+
+  // 导入本周记录
+  const handleImportWeek = async () => {
+    try {
+      const { text } = await exportWeek();
+      if (!text) {
+        toast.warning('本周暂无记录');
+        return;
+      }
+      if (dailyLog.trim() && !confirm('当前输入框有内容，是否覆盖？')) {
+        return;
+      }
+      setDailyLog(text);
+      toast.success('已导入本周记录');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : '导入失败');
+    }
+  };
 
   // 加载模型列表
   const { data: modelsData } = useRequest(getModels);
@@ -250,6 +279,14 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-[#8b949e]">AI 周报生成器</span>
           <button
+            onClick={() => navigate('/daily', { scope: 'root' })}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors"
+            title="每日记录"
+          >
+            <Calendar className="w-4 h-4" />
+            每日记录
+          </button>
+          <button
             onClick={() => navigate('/settings', { scope: 'root' })}
             className="p-2 rounded-lg text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors"
             title="设置"
@@ -282,6 +319,15 @@ export default function Home() {
           titleIcon="📝"
           previewTitle="预览"
           previewIcon="👁️"
+          headerRight={
+            <button
+              onClick={handleImportWeek}
+              className="px-3 py-1 rounded text-xs font-medium bg-[#21262d] text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#30363d] transition-colors"
+              title="从每日记录导入本周日志"
+            >
+              📥 导入本周
+            </button>
+          }
         />
 
         {/* 生成按钮区 */}
