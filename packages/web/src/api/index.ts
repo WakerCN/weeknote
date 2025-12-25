@@ -240,5 +240,111 @@ export const deletePrompt = (id: string) =>
 export const activatePrompt = (id: string) =>
   api.post<unknown, { success: boolean }>(`/prompts/${id}/activate`);
 
+// ========== 每日记录 API ==========
+
+// 每日记录类型
+export interface DailyRecord {
+  date: string;
+  dayOfWeek: string;
+  plan: string[];
+  result: string[];
+  issues: string[];
+  notes: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WeeklyLogFile {
+  version: 1;
+  year: number;
+  week: number;
+  weekStart: string;
+  weekEnd: string;
+  days: Record<string, DailyRecord>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WeekSummary {
+  fileName: string;
+  year: number;
+  week: number;
+  weekStart: string;
+  weekEnd: string;
+  filledDays: number;
+  lastUpdated: string;
+}
+
+export interface WeekStats {
+  weekStart: string;
+  weekEnd: string;
+  filledDays: number;
+  weekdaysFilled: number;
+  totalDays: number;
+}
+
+export interface SaveDayRecordParams {
+  plan: string[];
+  result: string[];
+  issues: string[];
+  notes: string[];
+}
+
+/**
+ * 获取所有周文件列表
+ */
+export const getWeekSummaries = () =>
+  api.get<unknown, { weeks: WeekSummary[] }>('/daily-logs/weeks');
+
+/**
+ * 获取某周的所有记录
+ */
+export const getWeek = (date?: string) =>
+  api.get<unknown, WeeklyLogFile>('/daily-logs/week', {
+    params: date ? { date } : {},
+  });
+
+/**
+ * 获取某天的记录
+ */
+export const getDay = (date: string) =>
+  api.get<unknown, DailyRecord | null>(`/daily-logs/day/${date}`);
+
+/**
+ * 保存某天的记录
+ */
+export const saveDay = (date: string, params: SaveDayRecordParams) =>
+  api.post<unknown, { success: boolean; record: DailyRecord }>(`/daily-logs/day/${date}`, params);
+
+/**
+ * 导出为文本格式
+ */
+export const exportWeek = (date?: string) =>
+  api.get<unknown, { text: string }>('/daily-logs/export', {
+    params: date ? { date } : {},
+  });
+
+/**
+ * 获取记录统计
+ */
+export const getWeekStats = (date?: string) =>
+  api.get<unknown, WeekStats>('/daily-logs/stats', {
+    params: date ? { date } : {},
+  });
+
+/**
+ * 在资源管理器中打开文件位置
+ */
+export const openInExplorer = (date: string) =>
+  api.post<unknown, { success: boolean; opened: string }>('/daily-logs/open-in-explorer', { date });
+
+/**
+ * 删除某周的记录
+ */
+export const deleteWeek = (fileName: string) =>
+  api.delete<unknown, { success: boolean; message: string }>('/daily-logs/week', {
+    params: { fileName },
+  });
+
 export default api;
 
