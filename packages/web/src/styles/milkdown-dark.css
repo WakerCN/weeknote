@@ -1,0 +1,23 @@
+/**
+ * Milkdown Crepe 主题调整
+ * 配合 frame-dark.css 原生暗色主题使用
+ * 仅包含必要的覆盖样式
+ */
+
+/* 编辑器容器 - 确保弹出层不被裁剪 */
+.milkdown-editor-container {
+  position: relative;
+}
+
+/* 斜杠菜单样式 - 确保高 z-index 和正确显示 */
+.milkdown-slash-menu,
+.crepe .milkdown-slash-menu,
+[data-milkdown-slash-menu] {
+  z-index: 9999 !important;
+}
+
+/* 斜杠菜单内部容器滚动控制 */
+.milkdown-slash-menu .menu-groups {
+  max-height: 350px !important;
+  overflow-y: auto !important;
+}

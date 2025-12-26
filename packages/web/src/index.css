@@ -1,3 +1,6 @@
+/* Milkdown 暗色主题样式 - @import 必须在最前面 */
+@import './styles/milkdown-dark.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
