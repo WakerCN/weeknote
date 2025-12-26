@@ -151,10 +151,10 @@ export class DailyLogManager {
       if (weekFile) {
         const filledDays = Object.values(weekFile.days).filter(
           (day) =>
-            day.plan.length > 0 ||
-            day.result.length > 0 ||
-            day.issues.length > 0 ||
-            day.notes.length > 0
+            day.plan.trim() ||
+            day.result.trim() ||
+            day.issues.trim() ||
+            day.notes.trim()
         ).length;
 
         summaries.push({
@@ -188,19 +188,27 @@ export class DailyLogManager {
       lines.push(`${dateKey} | ${day.dayOfWeek}`);
 
       lines.push('Plan');
-      day.plan.forEach((item) => lines.push(`- ${item}`));
+      if (day.plan.trim()) {
+        lines.push(day.plan.trim());
+      }
       lines.push('');
 
       lines.push('Result');
-      day.result.forEach((item) => lines.push(`- ${item}`));
+      if (day.result.trim()) {
+        lines.push(day.result.trim());
+      }
       lines.push('');
 
       lines.push('Issues');
-      day.issues.forEach((item) => lines.push(`- ${item}`));
+      if (day.issues.trim()) {
+        lines.push(day.issues.trim());
+      }
       lines.push('');
 
       lines.push('Notes');
-      day.notes.forEach((item) => lines.push(`- ${item}`));
+      if (day.notes.trim()) {
+        lines.push(day.notes.trim());
+      }
       lines.push('');
       lines.push('');
     }
@@ -223,10 +231,10 @@ export class DailyLogManager {
       const record = weekFile.days[dateInfo.date];
       const hasContent =
         record &&
-        (record.plan.length > 0 ||
-          record.result.length > 0 ||
-          record.issues.length > 0 ||
-          record.notes.length > 0);
+        (record.plan.trim() ||
+          record.result.trim() ||
+          record.issues.trim() ||
+          record.notes.trim());
 
       if (hasContent) {
         filledDays++;

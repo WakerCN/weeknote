@@ -10,14 +10,14 @@ export interface DailyRecord {
   date: string;
   /** 星期几 "周一" */
   dayOfWeek: string;
-  /** 计划内容 */
-  plan: string[];
-  /** 完成结果 */
-  result: string[];
-  /** 遇到的问题 */
-  issues: string[];
-  /** 备注 */
-  notes: string[];
+  /** 计划内容 (Markdown) */
+  plan: string;
+  /** 完成结果 (Markdown) */
+  result: string;
+  /** 遇到的问题 (Markdown) */
+  issues: string;
+  /** 备注 (Markdown) */
+  notes: string;
   /** 创建时间 ISO 格式 */
   createdAt: string;
   /** 更新时间 ISO 格式 */
