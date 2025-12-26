@@ -2,7 +2,7 @@
  * 每日记录页面
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRequest } from 'ahooks';
 import { toast } from 'sonner';
@@ -32,6 +32,12 @@ export default function DailyLog() {
   });
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart());
+  // 仅在“切换日期”时展示右侧模糊遮罩（保存触发的 refresh 不应该再次模糊）
+  const [isSwitchingDate, setIsSwitchingDate] = useState(false);
+  const dateSwitchRef = useRef<{ target: string | null; sawLoading: boolean }>({
+    target: null,
+    sawLoading: false,
+  });
 
   // 加载周列表
   const { data: weeksData, refresh: refreshWeeks } = useRequest(getWeekSummaries);
@@ -50,7 +56,7 @@ export default function DailyLog() {
   );
 
   // 加载当前日期记录
-  const { data: currentRecord, refresh: refreshRecord } = useRequest(
+  const { data: currentRecord, refresh: refreshRecord, loading: recordLoading } = useRequest(
     () => getDay(selectedDate),
     {
       refreshDeps: [selectedDate],
@@ -63,16 +69,44 @@ export default function DailyLog() {
   // 当URL参数变化时更新选中日期
   useEffect(() => {
     if (urlDate) {
-      setSelectedDate(urlDate);
+      if (urlDate !== selectedDate) {
+        setIsSwitchingDate(true);
+        dateSwitchRef.current = { target: urlDate, sawLoading: false };
+        setSelectedDate(urlDate);
+      }
     }
-  }, [urlDate]);
+  }, [urlDate, selectedDate]);
+
+  // 监听 recordLoading：只有“因切换日期”触发的加载才会驱动 isSwitchingDate 结束
+  useEffect(() => {
+    const { target, sawLoading } = dateSwitchRef.current;
+    if (!isSwitchingDate || !target || target !== selectedDate) return;
+
+    if (recordLoading) {
+      // 记录：我们确实进入过 loading（避免在 loading 尚未置 true 前就提前结束）
+      if (!sawLoading) {
+        dateSwitchRef.current = { target, sawLoading: true };
+      }
+      return;
+    }
+
+    // loading 已结束，并且确实经历过一次 loading：结束“切换日期”遮罩
+    if (sawLoading) {
+      setIsSwitchingDate(false);
+      dateSwitchRef.current = { target: null, sawLoading: false };
+    }
+  }, [recordLoading, selectedDate, isSwitchingDate]);
 
   // 保存记录
-  const handleSave = async (params: SaveDayRecordParams) => {
+  const handleSave = async (date: string, params: SaveDayRecordParams) => {
     try {
-      await saveDay(selectedDate, params);
-      await refreshRecord();
-      await refreshWeek();
+      await saveDay(date, params);
+      // 关键：如果用户已切换到其它日期，不要再 refresh 当前日期的 record，
+      // 否则会触发 recordLoading 二次抖动/二次模糊。
+      if (date === selectedDate) {
+        await refreshRecord();
+        await refreshWeek();
+      }
       await refreshWeeks();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '保存失败');
@@ -82,6 +116,9 @@ export default function DailyLog() {
 
   // 选择日期
   const handleSelectDate = (date: string) => {
+    if (date === selectedDate) return;
+    setIsSwitchingDate(true);
+    dateSwitchRef.current = { target: date, sawLoading: false };
     setSelectedDate(date);
     // 计算并更新该日期所在周的起始日期
     const weekStart = getWeekStart(date);
@@ -126,6 +163,10 @@ export default function DailyLog() {
 
   const weeks: WeekSummary[] = weeksData?.weeks || [];
   const records: Record<string, DailyRecord> = weekData?.days || {};
+  // ahooks/useRequest 在 refreshDeps 变化时可能保留上一份 data，
+  // 为了避免切换日期瞬间把“旧 record”传给新 date，做一次日期校验。
+  const safeCurrentRecord =
+    currentRecord && currentRecord.date === selectedDate ? currentRecord : null;
 
   // 今天所在的周
   const todayWeekStart = getWeekStart();
@@ -222,7 +263,8 @@ export default function DailyLog() {
         <div className="flex-1 overflow-hidden">
           <DayEditor
             date={selectedDate}
-            record={currentRecord || null}
+            record={safeCurrentRecord}
+            loading={isSwitchingDate}
             onSave={handleSave}
             onNavigate={handleNavigate}
           />
