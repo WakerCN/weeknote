@@ -246,10 +246,10 @@ export const activatePrompt = (id: string) =>
 export interface DailyRecord {
   date: string;
   dayOfWeek: string;
-  plan: string[];
-  result: string[];
-  issues: string[];
-  notes: string[];
+  plan: string;
+  result: string;
+  issues: string;
+  notes: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -284,10 +284,10 @@ export interface WeekStats {
 }
 
 export interface SaveDayRecordParams {
-  plan: string[];
-  result: string[];
-  issues: string[];
-  notes: string[];
+  plan: string;
+  result: string;
+  issues: string;
+  notes: string;
 }
 
 /**

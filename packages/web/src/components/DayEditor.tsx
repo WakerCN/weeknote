@@ -17,45 +17,6 @@ const formatDateChinese = (date: string): string => {
   return `${month}月${day}日`;
 };
 
-/**
- * 将旧格式 (string[]) 转换为 Markdown 字符串
- * 兼容旧数据格式
- */
-const migrateToMarkdown = (data: string[] | string | undefined): string => {
-  if (!data) return '';
-  if (typeof data === 'string') return data;
-  // 将数组转换为 Markdown 列表
-  return data
-    .filter((item) => item.trim())
-    .map((item) => `- ${item}`)
-    .join('\n');
-};
-
-/**
- * 将 Markdown 字符串转换为旧格式 (string[])
- * 用于保存时兼容后端
- */
-const markdownToArray = (markdown: string): string[] => {
-  if (!markdown.trim()) return [];
-
-  // 解析 Markdown 列表项
-  const lines = markdown.split('\n');
-  const items: string[] = [];
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    // 匹配列表项: "- item" 或 "* item" 或 "1. item"
-    const listMatch = trimmed.match(/^[-*]\s+(.+)$/) || trimmed.match(/^\d+\.\s+(.+)$/);
-    if (listMatch) {
-      items.push(listMatch[1]);
-    } else if (trimmed && !trimmed.startsWith('#')) {
-      // 非列表格式的文本也保留
-      items.push(trimmed);
-    }
-  }
-
-  return items;
-};
 
 interface DayEditorProps {
   /** 当前日期 */
@@ -180,12 +141,11 @@ export default function DayEditor({
 
       setSaveStatus('saving');
       try {
-        // 转换为数组格式以兼容后端
         await onSave(targetDate, {
-          plan: markdownToArray(planVal),
-          result: markdownToArray(resultVal),
-          issues: markdownToArray(issuesVal),
-          notes: markdownToArray(notesVal),
+          plan: planVal,
+          result: resultVal,
+          issues: issuesVal,
+          notes: notesVal,
         });
         // 防止“保存完成时已经切走日期”导致新日期 UI 被旧保存覆盖
         if (targetDate !== date) return;
@@ -224,10 +184,10 @@ export default function DayEditor({
     // 进入一次“初始化同步”窗口，避免 setPlan 触发 onChange -> 自动保存
     isInitializedRef.current = false;
 
-    const newPlan = record ? migrateToMarkdown(record.plan) : '';
-    const newResult = record ? migrateToMarkdown(record.result) : '';
-    const newIssues = record ? migrateToMarkdown(record.issues) : '';
-    const newNotes = record ? migrateToMarkdown(record.notes) : '';
+    const newPlan = record?.plan || '';
+    const newResult = record?.result || '';
+    const newIssues = record?.issues || '';
+    const newNotes = record?.notes || '';
 
     setPlan(newPlan);
     setResult(newResult);
