@@ -100,10 +100,10 @@ router.post('/day/:date', async (req, res) => {
     await dailyLogManager.saveDay({
       date,
       dayOfWeek,
-      plan: Array.isArray(plan) ? plan : [],
-      result: Array.isArray(result) ? result : [],
-      issues: Array.isArray(issues) ? issues : [],
-      notes: Array.isArray(notes) ? notes : [],
+      plan: typeof plan === 'string' ? plan : '',
+      result: typeof result === 'string' ? result : '',
+      issues: typeof issues === 'string' ? issues : '',
+      notes: typeof notes === 'string' ? notes : '',
     });
     
     const updated = await dailyLogManager.getDay(date);
