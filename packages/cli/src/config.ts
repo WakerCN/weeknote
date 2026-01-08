@@ -17,7 +17,7 @@ const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 /**
  * 平台类型
  */
-export type Platform = 'siliconflow' | 'deepseek' | 'openai';
+export type Platform = 'siliconflow' | 'deepseek' | 'openai' | 'doubao';
 
 /**
  * 配置文件结构
@@ -30,6 +30,7 @@ export interface CLIConfig {
     siliconflow?: string;
     deepseek?: string;
     openai?: string;
+    doubao?: string;
   };
   // 兼容旧版配置
   primary?: {
@@ -45,6 +46,7 @@ export function getPlatformFromModelId(modelId: ModelId): Platform {
   if (modelId.startsWith('siliconflow/')) return 'siliconflow';
   if (modelId.startsWith('deepseek/')) return 'deepseek';
   if (modelId.startsWith('openai/')) return 'openai';
+  if (modelId.startsWith('doubao/')) return 'doubao';
   return 'siliconflow'; // 默认
 }
 
@@ -166,6 +168,7 @@ export function getConfigFromEnv(): GeneratorConfig | null {
   const siliconflowKey = process.env.SILICONFLOW_API_KEY;
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
+  const doubaoKey = process.env.DOUBAO_API_KEY || process.env.ARK_API_KEY;
 
   // 优先使用免费模型
   if (siliconflowKey) {
@@ -177,6 +180,12 @@ export function getConfigFromEnv(): GeneratorConfig | null {
   if (deepseekKey) {
     return {
       primary: { modelId: 'deepseek/deepseek-chat', apiKey: deepseekKey },
+    };
+  }
+
+  if (doubaoKey) {
+    return {
+      primary: { modelId: 'doubao/seed-1.6', apiKey: doubaoKey },
     };
   }
 
@@ -229,6 +238,7 @@ export function getConfiguredPlatforms(): Platform[] {
   if (config.apiKeys?.siliconflow) platforms.push('siliconflow');
   if (config.apiKeys?.deepseek) platforms.push('deepseek');
   if (config.apiKeys?.openai) platforms.push('openai');
+  if (config.apiKeys?.doubao) platforms.push('doubao');
 
   return platforms;
 }

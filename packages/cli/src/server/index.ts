@@ -117,6 +117,7 @@ export function createServer(): Express {
     const siliconflowKey = config.apiKeys?.siliconflow || process.env.SILICONFLOW_API_KEY || null;
     const deepseekKey = config.apiKeys?.deepseek || process.env.DEEPSEEK_API_KEY || null;
     const openaiKey = config.apiKeys?.openai || process.env.OPENAI_API_KEY || null;
+    const doubaoKey = config.apiKeys?.doubao || process.env.DOUBAO_API_KEY || process.env.ARK_API_KEY || null;
 
     res.json({
       defaultModel: config.defaultModel || DEFAULT_MODEL,
@@ -124,6 +125,7 @@ export function createServer(): Express {
         siliconflow: siliconflowKey,
         deepseek: deepseekKey,
         openai: openaiKey,
+        doubao: doubaoKey,
       },
     });
   });
@@ -149,6 +151,7 @@ export function createServer(): Express {
           ...(apiKeys?.siliconflow && { siliconflow: apiKeys.siliconflow }),
           ...(apiKeys?.deepseek && { deepseek: apiKeys.deepseek }),
           ...(apiKeys?.openai && { openai: apiKeys.openai }),
+          ...(apiKeys?.doubao && { doubao: apiKeys.doubao }),
         },
       };
 
@@ -170,7 +173,7 @@ export function createServer(): Express {
     try {
       const { platform } = req.params;
 
-      if (!['siliconflow', 'deepseek', 'openai'].includes(platform)) {
+      if (!['siliconflow', 'deepseek', 'openai', 'doubao'].includes(platform)) {
         return res.status(400).json({ error: '无效的平台' });
       }
 
@@ -178,7 +181,7 @@ export function createServer(): Express {
 
       // 删除指定平台的 API Key
       if (currentConfig.apiKeys) {
-        delete currentConfig.apiKeys[platform as 'siliconflow' | 'deepseek' | 'openai'];
+        delete currentConfig.apiKeys[platform as 'siliconflow' | 'deepseek' | 'openai' | 'doubao'];
       }
 
       saveConfig(currentConfig);

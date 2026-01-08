@@ -13,7 +13,7 @@ export interface ModelInfo {
 }
 
 // 平台类型
-export type Platform = 'siliconflow' | 'deepseek' | 'openai';
+export type Platform = 'siliconflow' | 'deepseek' | 'openai' | 'doubao';
 
 // 配置类型
 export interface AppConfig {

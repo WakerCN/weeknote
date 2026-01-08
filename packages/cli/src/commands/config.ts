@@ -86,6 +86,7 @@ export function runConfigKey(options: ConfigKeyOptions): void {
     siliconflow: '硅基流动',
     deepseek: 'DeepSeek',
     openai: 'OpenAI',
+    doubao: '火山方舟（豆包）',
   };
 
   console.log(chalk.green(`✅ 已设置 ${platformNames[platform]} API Key`));
@@ -168,6 +169,7 @@ export async function runConfigDefaultInteractive(): Promise<void> {
         siliconflow: '硅基流动',
         deepseek: 'DeepSeek',
         openai: 'OpenAI',
+        doubao: '火山方舟（豆包）',
       };
 
       console.log(chalk.yellow(`\n⚠️  尚未配置 ${platformNames[platform]} 的 API Key`));
@@ -318,6 +320,7 @@ export async function runConfigInit(): Promise<void> {
         siliconflow: 'https://cloud.siliconflow.cn/',
         deepseek: 'https://platform.deepseek.com/',
         openai: 'https://platform.openai.com/',
+        doubao: 'https://console.volcengine.com/ark',
       };
 
       console.log(chalk.gray(`\n获取 API Key: ${platformUrls[platform]}\n`));

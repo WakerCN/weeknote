@@ -7,15 +7,18 @@
  * 格式: 平台/模型简称
  */
 export type ModelId =
-  // 硅基流动免费模型
-  | 'siliconflow/qwen2.5-7b'
-  | 'siliconflow/glm-4-9b'
-  | 'siliconflow/glm-z1-9b'
+  // 豆包（火山方舟）- Seed 系列最新模型
+  | 'doubao/seed-1.8'
+  | 'doubao/seed-1.6'
   // DeepSeek 官方
   | 'deepseek/deepseek-chat'
   // OpenAI
   | 'openai/gpt-4o'
-  | 'openai/gpt-4o-mini';
+  | 'openai/gpt-4o-mini'
+  // 硅基流动免费模型
+  | 'siliconflow/qwen2.5-7b'
+  | 'siliconflow/glm-4-9b'
+  | 'siliconflow/glm-z1-9b';
 
 /**
  * 模型元信息
@@ -39,30 +42,22 @@ export interface ModelMeta {
  * 所有支持的模型配置
  */
 export const MODEL_REGISTRY: Record<ModelId, ModelMeta> = {
-  // 硅基流动免费模型
-  'siliconflow/qwen2.5-7b': {
-    id: 'siliconflow/qwen2.5-7b',
-    name: '通义千问 2.5 (7B)',
-    apiModel: 'Qwen/Qwen2.5-7B-Instruct',
-    baseUrl: 'https://api.siliconflow.cn/v1',
-    isFree: true,
-    description: '阿里通义千问开源模型，适合日常使用',
+  // 豆包（火山方舟）- Seed 系列最新模型
+  'doubao/seed-1.8': {
+    id: 'doubao/seed-1.8',
+    name: '豆包 Seed 1.8',
+    apiModel: 'doubao-seed-1.8',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    isFree: false,
+    description: '豆包最新旗舰模型，多模态 Agent 能力增强',
   },
-  'siliconflow/glm-4-9b': {
-    id: 'siliconflow/glm-4-9b',
-    name: '智谱 GLM-4 (9B)',
-    apiModel: 'THUDM/glm-4-9b-chat',
-    baseUrl: 'https://api.siliconflow.cn/v1',
-    isFree: true,
-    description: '智谱 AI 开源模型，中文能力强',
-  },
-  'siliconflow/glm-z1-9b': {
-    id: 'siliconflow/glm-z1-9b',
-    name: '智谱 GLM-Z1 (9B)',
-    apiModel: 'THUDM/GLM-Z1-9B-0414',
-    baseUrl: 'https://api.siliconflow.cn/v1',
-    isFree: true,
-    description: '智谱 AI 最新开源模型',
+  'doubao/seed-1.6': {
+    id: 'doubao/seed-1.6',
+    name: '豆包 Seed 1.6',
+    apiModel: 'doubao-seed-1.6',
+    baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+    isFree: false,
+    description: '支持分档思考长度，平衡效果与成本',
   },
   // DeepSeek 官方
   'deepseek/deepseek-chat': {
@@ -89,6 +84,31 @@ export const MODEL_REGISTRY: Record<ModelId, ModelMeta> = {
     baseUrl: 'https://api.openai.com/v1',
     isFree: false,
     description: 'OpenAI 轻量模型，速度快',
+  },
+  // 硅基流动免费模型
+  'siliconflow/qwen2.5-7b': {
+    id: 'siliconflow/qwen2.5-7b',
+    name: '通义千问 2.5 (7B)',
+    apiModel: 'Qwen/Qwen2.5-7B-Instruct',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    isFree: true,
+    description: '阿里通义千问开源模型，适合日常使用',
+  },
+  'siliconflow/glm-4-9b': {
+    id: 'siliconflow/glm-4-9b',
+    name: '智谱 GLM-4 (9B)',
+    apiModel: 'THUDM/glm-4-9b-chat',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    isFree: true,
+    description: '智谱 AI 开源模型，中文能力强',
+  },
+  'siliconflow/glm-z1-9b': {
+    id: 'siliconflow/glm-z1-9b',
+    name: '智谱 GLM-Z1 (9B)',
+    apiModel: 'THUDM/GLM-Z1-9B-0414',
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    isFree: true,
+    description: '智谱 AI 最新开源模型',
   },
 };
 
