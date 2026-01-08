@@ -346,5 +346,63 @@ export const deleteWeek = (fileName: string) =>
     params: { fileName },
   });
 
+// ========== 提醒功能 API ==========
+
+// 提醒时间配置
+export interface ScheduleConfig {
+  hour: number;
+  minute: number;
+  enabled: boolean;
+}
+
+// 提醒配置
+export interface ReminderConfig {
+  enabled: boolean;
+  sendKey: string;
+  schedules: {
+    morning: ScheduleConfig;
+    evening: ScheduleConfig;
+  };
+  updatedAt: string;
+  scheduler: {
+    running: boolean;
+  };
+  holidayData: {
+    year: number;
+    source: string;
+    updatedAt: string;
+    holidaysCount: number;
+    workdaysCount: number;
+  } | null;
+  availableYears: number[];
+}
+
+// 保存提醒配置参数
+export interface SaveReminderParams {
+  enabled?: boolean;
+  sendKey?: string;
+  schedules?: {
+    morning?: Partial<ScheduleConfig>;
+    evening?: Partial<ScheduleConfig>;
+  };
+}
+
+/**
+ * 获取提醒配置
+ */
+export const getReminder = () => api.get<unknown, ReminderConfig>('/reminder');
+
+/**
+ * 保存提醒配置
+ */
+export const saveReminder = (params: SaveReminderParams) =>
+  api.put<unknown, { success: boolean; config: ReminderConfig }>('/reminder', params);
+
+/**
+ * 测试推送
+ */
+export const testReminder = (sendKey: string) =>
+  api.post<unknown, { success: boolean; error?: string }>('/reminder/test', { sendKey });
+
 export default api;
 

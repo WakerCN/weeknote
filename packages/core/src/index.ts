@@ -17,3 +17,6 @@ export * from './types/index.js';
 
 // 每日记录模块
 export * from './daily-log/index.js';
+
+// 提醒功能模块
+export * from './reminder/index.js';

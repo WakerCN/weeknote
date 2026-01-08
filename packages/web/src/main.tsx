@@ -9,6 +9,7 @@ import './index.css';
 const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'));
 const ApiKeyModel = lazy(() => import('./pages/settings/ApiKeyModel'));
 const PromptSettings = lazy(() => import('./pages/settings/PromptSettings'));
+const ReminderSettings = lazy(() => import('./pages/settings/ReminderSettings'));
 const DailyLog = lazy(() => import('./pages/DailyLog'));
 
 // 加载中占位组件
@@ -67,6 +68,14 @@ const router = createBrowserRouter([
         element: (
           <Suspense fallback={<LoadingFallback />}>
             <PromptSettings />
+          </Suspense>
+        ),
+      },
+      {
+        path: 'reminder',
+        element: (
+          <Suspense fallback={<LoadingFallback />}>
+            <ReminderSettings />
           </Suspense>
         ),
       },

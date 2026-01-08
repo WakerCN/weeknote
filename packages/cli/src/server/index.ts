@@ -19,12 +19,7 @@ import {
   type ModelId,
   type ValidationWarning,
 } from '@weeknote/core';
-import {
-  loadConfig,
-  saveConfig,
-  getPlatformFromModelId,
-  type CLIConfig,
-} from '../config.js';
+import { loadConfig, saveConfig, getPlatformFromModelId, type CLIConfig } from '../config.js';
 import {
   loadPromptsConfig,
   getActiveTemplate,
@@ -36,6 +31,8 @@ import {
   DEFAULT_USER_PROMPT_TEMPLATE,
 } from '../prompt-config.js';
 import dailyLogsRouter from './daily-logs.js';
+import reminderRouter from './reminder.js';
+import { reminderScheduler } from '@weeknote/core';
 import type { Express } from 'express';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -365,7 +362,9 @@ export function createServer(): Express {
       // 获取激活的 Prompt 模板
       const activeTemplate = getActiveTemplate();
 
-      console.log(`[API] 开始生成周报，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}`);
+      console.log(
+        `[API] 开始生成周报，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}`
+      );
       if (warnings.length > 0) {
         console.log(`[API] 格式警告: ${warnings.map((w) => w.type).join(', ')}`);
       }
@@ -436,7 +435,9 @@ export function createServer(): Express {
 
       const weeklyLog = parseDailyLog(dailyLog);
 
-      console.log(`[API] 开始流式生成，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}`);
+      console.log(
+        `[API] 开始流式生成，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}`
+      );
       if (warnings.length > 0) {
         console.log(`[API] 格式警告: ${warnings.map((w) => w.type).join(', ')}`);
       }
@@ -487,6 +488,9 @@ export function createServer(): Express {
 
   // 每日记录 API
   app.use('/api/daily-logs', dailyLogsRouter);
+
+  // 提醒功能 API
+  app.use('/api/reminder', reminderRouter);
 
   // SPA 路由回退 - 所有非 API 路由返回 index.html
   app.get('*', (_req, res) => {
@@ -560,6 +564,11 @@ export async function startServer(preferredPort: number = 3000): Promise<number>
       }
 
       console.log('');
+
+      // 启动提醒定时任务
+      reminderScheduler.start();
+
+      console.log('');
       console.log('按 Ctrl+C 停止服务器');
       console.log('');
 
@@ -571,4 +580,3 @@ export async function startServer(preferredPort: number = 3000): Promise<number>
     });
   });
 }
-

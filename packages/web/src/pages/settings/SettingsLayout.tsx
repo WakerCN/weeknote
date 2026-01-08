@@ -20,6 +20,12 @@ const MENU_ITEMS = [
     label: 'Prompt 模板',
     description: '管理 AI 提示词模板',
   },
+  {
+    path: '/settings/reminder',
+    icon: '🔔',
+    label: '提醒设置',
+    description: '配置微信提醒通知',
+  },
 ];
 
 export default function SettingsLayout() {
