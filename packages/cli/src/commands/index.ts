@@ -10,7 +10,9 @@ export {
   runConfigKey,
   runConfigDefault,
   runConfigInit,
+  runConfigEndpoint,
   type ConfigSetOptions,
   type ConfigKeyOptions,
+  type ConfigEndpointOptions,
 } from './config.js';
 export { runServe } from './serve.js';

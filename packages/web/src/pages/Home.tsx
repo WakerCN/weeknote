@@ -187,11 +187,15 @@ export default function Home() {
   const modelOptions: ComboboxOption[] = useMemo(() => {
     const models = modelsData?.models || [];
     const apiKeys = configData?.apiKeys || { siliconflow: null, deepseek: null, openai: null, doubao: null };
+    const doubaoEndpoint = configData?.doubaoEndpoint;
     const defaultModel = configData?.defaultModel;
 
     return models.map((model: ModelInfo) => {
       const platform = getPlatform(model.id);
-      const isConfigured = !!apiKeys[platform];
+      // 豆包需要同时有 API Key 和接入点
+      const isConfigured = platform === 'doubao' 
+        ? !!apiKeys[platform] && !!doubaoEndpoint
+        : !!apiKeys[platform];
       const isDefault = model.id === defaultModel;
 
       // 构建标签

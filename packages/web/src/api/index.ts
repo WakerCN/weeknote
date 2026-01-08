@@ -19,12 +19,14 @@ export type Platform = 'siliconflow' | 'deepseek' | 'openai' | 'doubao';
 export interface AppConfig {
   defaultModel: string | null;
   apiKeys: Record<Platform, string | null>; // 脱敏的 API Key 或 null（未配置）
+  doubaoEndpoint?: string | null; // 豆包接入点 ID
 }
 
 // 保存配置的参数
 export interface SaveConfigParams {
   defaultModel?: string;
   apiKeys?: Partial<Record<Platform, string>>;
+  doubaoEndpoint?: string; // 豆包接入点 ID
 }
 
 // 校验警告类型

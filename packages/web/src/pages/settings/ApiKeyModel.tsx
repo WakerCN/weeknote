@@ -47,23 +47,34 @@ function ApiKeyCard({
   name,
   url,
   apiKey,
+  endpointId,
   onSave,
   onDelete,
+  onSaveEndpoint,
 }: {
   platform: Platform;
   name: string;
   url: string;
   apiKey: string | null;
+  endpointId?: string | null;
   onSave: (key: string) => Promise<void>;
   onDelete: () => Promise<void>;
+  onSaveEndpoint?: (endpoint: string) => Promise<void>;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // 豆包接入点相关状态
+  const [isEditingEndpoint, setIsEditingEndpoint] = useState(false);
+  const [endpointInputValue, setEndpointInputValue] = useState('');
+  const [isSavingEndpoint, setIsSavingEndpoint] = useState(false);
 
   const isConfigured = !!apiKey;
+  const needsEndpoint = platform === 'doubao';
+  const hasEndpoint = !!endpointId;
 
   const handleSave = async () => {
     if (!inputValue.trim()) {
@@ -92,6 +103,29 @@ function ApiKeyCard({
   const handleCancel = () => {
     setIsEditing(false);
     setInputValue('');
+  };
+
+  // 保存接入点
+  const handleSaveEndpoint = async () => {
+    if (!endpointInputValue.trim()) {
+      toast.error('请输入接入点 ID');
+      return;
+    }
+    if (!onSaveEndpoint) return;
+    
+    setIsSavingEndpoint(true);
+    try {
+      await onSaveEndpoint(endpointInputValue.trim());
+      setEndpointInputValue('');
+      setIsEditingEndpoint(false);
+    } finally {
+      setIsSavingEndpoint(false);
+    }
+  };
+
+  const handleCancelEndpoint = () => {
+    setIsEditingEndpoint(false);
+    setEndpointInputValue('');
   };
 
   return (
@@ -216,6 +250,95 @@ function ApiKeyCard({
           </div>
         )}
       </div>
+
+      {/* 豆包接入点配置（仅豆包平台显示） */}
+      {needsEndpoint && isConfigured && (
+        <div className="mt-4 pt-4 border-t border-[#30363d]">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[#8b949e]">接入点 ID</span>
+              {hasEndpoint && !isEditingEndpoint ? (
+                <span className="text-xs text-emerald-400">✓ 已配置</span>
+              ) : (
+                <span className="text-xs text-yellow-400">⚠ 需配置</span>
+              )}
+            </div>
+            <a
+              href="https://console.volcengine.com/ark/region:ark+cn-beijing/endpoint"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-[#58a6ff] hover:underline"
+            >
+              创建接入点 →
+            </a>
+          </div>
+          <p className="text-xs text-[#484f58] mb-3">
+            需要在火山方舟控制台创建推理接入点，获取 ep-xxxxx 格式的 ID
+          </p>
+          
+          <div className="h-10">
+            {hasEndpoint && !isEditingEndpoint ? (
+              // 已配置接入点
+              <div className="flex items-center gap-3 h-full">
+                <div className="flex-1 px-3 h-full flex items-center bg-[#161b22] border border-[#30363d] rounded-lg font-mono text-sm text-[#8b949e]">
+                  <span className="whitespace-nowrap">{endpointId}</span>
+                </div>
+                <button
+                  onClick={() => setIsEditingEndpoint(true)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors"
+                  title="编辑"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              </div>
+            ) : (
+              // 编辑接入点
+              <div className="flex gap-2 h-full">
+                <input
+                  type="text"
+                  value={endpointInputValue}
+                  onChange={(e) => setEndpointInputValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && endpointInputValue.trim()) {
+                      handleSaveEndpoint();
+                    }
+                    if (e.key === 'Escape') {
+                      handleCancelEndpoint();
+                    }
+                  }}
+                  placeholder="ep-xxxxx"
+                  autoFocus={isEditingEndpoint}
+                  className="flex-1 px-3 h-full bg-[#161b22] border border-[#30363d] rounded-lg text-[#f0f6fc] placeholder-[#484f58] focus:outline-none focus:border-[#58a6ff] font-mono"
+                />
+                <button
+                  onClick={handleSaveEndpoint}
+                  disabled={isSavingEndpoint || !endpointInputValue.trim()}
+                  className={`
+                    px-4 h-full rounded-lg font-medium text-sm transition-all duration-200 shrink-0
+                    ${
+                      isSavingEndpoint || !endpointInputValue.trim()
+                        ? 'bg-[#21262d] text-[#484f58] cursor-not-allowed'
+                        : 'bg-[#238636] text-white hover:bg-[#2ea043]'
+                    }
+                  `}
+                >
+                  {isSavingEndpoint ? '保存中...' : '保存'}
+                </button>
+                {isEditingEndpoint && (
+                  <button
+                    onClick={handleCancelEndpoint}
+                    className="px-4 h-full rounded-lg font-medium text-sm transition-all duration-200 bg-[#21262d] text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#30363d]"
+                  >
+                    取消
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -245,8 +368,11 @@ export default function ApiKeyModel() {
     return 'openai';
   };
 
-  // 检查平台是否已配置
+  // 检查平台是否已配置（豆包需要同时有 API Key 和接入点）
   const isPlatformConfigured = (platform: Platform): boolean => {
+    if (platform === 'doubao') {
+      return !!config.apiKeys[platform] && !!config.doubaoEndpoint;
+    }
     return !!config.apiKeys[platform];
   };
 
@@ -270,6 +396,18 @@ export default function ApiKeyModel() {
       toast.success(`${PLATFORMS.find((p) => p.key === platform)?.name} API Key 已删除`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '删除失败');
+      throw err;
+    }
+  };
+
+  // 保存豆包接入点
+  const handleSaveDoubaoEndpoint = async (endpointId: string) => {
+    try {
+      await saveConfig({ doubaoEndpoint: endpointId });
+      await refreshConfig();
+      toast.success('豆包接入点 ID 保存成功');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '保存失败');
       throw err;
     }
   };
@@ -324,8 +462,10 @@ export default function ApiKeyModel() {
                   name={name}
                   url={url}
                   apiKey={config.apiKeys[key]}
+                  endpointId={key === 'doubao' ? config.doubaoEndpoint : undefined}
                   onSave={(newKey) => handleSaveApiKey(key, newKey)}
                   onDelete={() => handleDeleteApiKey(key)}
+                  onSaveEndpoint={key === 'doubao' ? handleSaveDoubaoEndpoint : undefined}
                 />
               ))}
             </div>
@@ -400,6 +540,10 @@ export default function ApiKeyModel() {
                               <div className="text-right">
                                 {isConfigured ? (
                                   <span className="text-xs text-emerald-400">可用</span>
+                                ) : platformKey === 'doubao' ? (
+                                  <span className="text-xs text-yellow-400">
+                                    {!config.apiKeys[platformKey] ? '需配置 Key' : '需配置接入点'}
+                                  </span>
                                 ) : (
                                   <span className="text-xs text-yellow-400">需配置 Key</span>
                                 )}

@@ -32,6 +32,8 @@ export interface CLIConfig {
     openai?: string;
     doubao?: string;
   };
+  /** 豆包（火山方舟）接入点 ID */
+  doubaoEndpoint?: string;
   // 兼容旧版配置
   primary?: {
     modelId: ModelId;
@@ -112,6 +114,23 @@ export function getApiKey(platform: Platform): string | undefined {
 }
 
 /**
+ * 设置豆包接入点 ID
+ */
+export function setDoubaoEndpoint(endpointId: string): void {
+  const config = loadConfig();
+  config.doubaoEndpoint = endpointId;
+  saveConfig(config);
+}
+
+/**
+ * 获取豆包接入点 ID
+ */
+export function getDoubaoEndpoint(): string | undefined {
+  const config = loadConfig();
+  return config.doubaoEndpoint;
+}
+
+/**
  * 获取默认模型
  */
 export function getDefaultModel(): ModelId {
@@ -157,7 +176,12 @@ export function toGeneratorConfig(cliConfig: CLIConfig): GeneratorConfig | null 
   }
 
   return {
-    primary: { modelId: defaultModel, apiKey },
+    primary: { 
+      modelId: defaultModel, 
+      apiKey,
+      // 豆包需要接入点 ID
+      ...(platform === 'doubao' && cliConfig.doubaoEndpoint ? { endpointId: cliConfig.doubaoEndpoint } : {}),
+    },
   };
 }
 
@@ -169,6 +193,7 @@ export function getConfigFromEnv(): GeneratorConfig | null {
   const deepseekKey = process.env.DEEPSEEK_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const doubaoKey = process.env.DOUBAO_API_KEY || process.env.ARK_API_KEY;
+  const doubaoEndpoint = process.env.DOUBAO_ENDPOINT || process.env.ARK_ENDPOINT;
 
   // 优先使用免费模型
   if (siliconflowKey) {
@@ -183,9 +208,10 @@ export function getConfigFromEnv(): GeneratorConfig | null {
     };
   }
 
-  if (doubaoKey) {
+  // 豆包需要同时配置 API Key 和 Endpoint
+  if (doubaoKey && doubaoEndpoint) {
     return {
-      primary: { modelId: 'doubao/seed-1.6', apiKey: doubaoKey },
+      primary: { modelId: 'doubao/seed-1.6', apiKey: doubaoKey, endpointId: doubaoEndpoint },
     };
   }
 

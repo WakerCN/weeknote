@@ -157,6 +157,8 @@ export interface ModelConfig {
   baseUrl?: string;
   /** 生成温度参数（可选，默认 0.3） */
   temperature?: number;
+  /** 接入点 ID（火山方舟/豆包必需，格式如 ep-xxxxx） */
+  endpointId?: string;
 }
 
 /**

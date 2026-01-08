@@ -14,6 +14,7 @@ import {
   runConfigKey,
   runConfigDefault,
   runConfigInit,
+  runConfigEndpoint,
   runServe,
 } from './commands/index.js';
 
@@ -59,10 +60,18 @@ configCmd
 configCmd
   .command('key')
   .description('设置平台 API Key')
-  .requiredOption('-p, --platform <name>', '平台名称 (siliconflow/deepseek/openai)')
+  .requiredOption('-p, --platform <name>', '平台名称 (siliconflow/deepseek/openai/doubao)')
   .requiredOption('-k, --key <apiKey>', 'API Key')
   .action((options) => {
     runConfigKey(options);
+  });
+
+configCmd
+  .command('endpoint')
+  .description('设置豆包（火山方舟）接入点 ID')
+  .requiredOption('-e, --endpoint <id>', '接入点 ID (如: ep-xxxxx)')
+  .action((options) => {
+    runConfigEndpoint(options);
   });
 
 configCmd

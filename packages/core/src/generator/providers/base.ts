@@ -157,15 +157,37 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 
   /**
+   * 获取实际的模型名称（豆包使用接入点 ID）
+   */
+  protected getActualModel(config: ModelConfig): string {
+    const meta = this.getModelMeta();
+    
+    // 豆包（火山方舟）需要使用接入点 ID
+    if (this.modelId.startsWith('doubao/')) {
+      if (!config.endpointId) {
+        throw new GeneratorError(
+          'AUTH_ERROR',
+          '豆包模型需要配置接入点 ID（Endpoint ID），请在火山方舟控制台创建推理接入点后配置',
+          this.modelId
+        );
+      }
+      return config.endpointId;
+    }
+    
+    return meta.apiModel;
+  }
+
+  /**
    * 生成回复
    */
   async generate(messages: ChatMessage[], config: ModelConfig): Promise<string> {
     const client = this.createClient(config);
     const meta = this.getModelMeta();
+    const actualModel = this.getActualModel(config);
 
     try {
       const response = await client.chat.completions.create({
-        model: meta.apiModel,
+        model: actualModel,
         messages,
         temperature: config.temperature ?? 0.3,
       });
@@ -195,10 +217,11 @@ export class OpenAICompatibleProvider implements LLMProvider {
   ): Promise<string> {
     const client = this.createClient(config);
     const meta = this.getModelMeta();
+    const actualModel = this.getActualModel(config);
 
     try {
       const stream = await client.chat.completions.create({
-        model: meta.apiModel,
+        model: actualModel,
         messages,
         temperature: config.temperature ?? 0.3,
         stream: true,

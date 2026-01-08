@@ -18,6 +18,8 @@ import {
   getConfiguredPlatforms,
   getModelsForPlatform,
   getPlatformFromModelId,
+  setDoubaoEndpoint,
+  getDoubaoEndpoint,
   type Platform,
 } from '../config.js';
 
@@ -29,6 +31,10 @@ export interface ConfigSetOptions {
 export interface ConfigKeyOptions {
   platform: string;
   key: string;
+}
+
+export interface ConfigEndpointOptions {
+  endpoint: string;
 }
 
 /**
@@ -66,12 +72,13 @@ export function runConfigSet(options: ConfigSetOptions): void {
 export function runConfigKey(options: ConfigKeyOptions): void {
   const platform = options.platform.toLowerCase() as Platform;
 
-  if (!['siliconflow', 'deepseek', 'openai'].includes(platform)) {
+  if (!['siliconflow', 'deepseek', 'openai', 'doubao'].includes(platform)) {
     console.error(chalk.red(`❌ 无效的平台: ${options.platform}`));
     console.log(chalk.gray('\n支持的平台:'));
     console.log(chalk.gray('  - siliconflow (硅基流动)'));
     console.log(chalk.gray('  - deepseek (DeepSeek)'));
     console.log(chalk.gray('  - openai (OpenAI)'));
+    console.log(chalk.gray('  - doubao (火山方舟/豆包)'));
     process.exit(1);
   }
 
@@ -91,6 +98,14 @@ export function runConfigKey(options: ConfigKeyOptions): void {
 
   console.log(chalk.green(`✅ 已设置 ${platformNames[platform]} API Key`));
 
+  // 豆包需要额外配置接入点
+  if (platform === 'doubao') {
+    console.log(chalk.yellow('\n⚠️  豆包还需要配置接入点 ID（Endpoint ID）'));
+    console.log(chalk.gray('  请在火山方舟控制台创建推理接入点后运行:'));
+    console.log(chalk.gray('  weeknote config endpoint -e <your-endpoint-id>'));
+    console.log(chalk.gray('\n  获取接入点: https://console.volcengine.com/ark'));
+  }
+
   const models = getModelsForPlatform(platform);
   console.log(chalk.gray(`\n可使用的模型:`));
   models.forEach((m) => {
@@ -98,6 +113,35 @@ export function runConfigKey(options: ConfigKeyOptions): void {
     const freeTag = meta.isFree ? chalk.green(' [免费]') : '';
     console.log(chalk.gray(`  - ${m}${freeTag}`));
   });
+}
+
+/**
+ * 执行 config endpoint 命令 - 设置豆包接入点 ID
+ */
+export function runConfigEndpoint(options: ConfigEndpointOptions): void {
+  if (!options.endpoint || options.endpoint.trim() === '') {
+    console.error(chalk.red('❌ 接入点 ID 不能为空'));
+    process.exit(1);
+  }
+
+  const endpoint = options.endpoint.trim();
+  
+  // 验证接入点格式（通常以 ep- 开头）
+  if (!endpoint.startsWith('ep-')) {
+    console.log(chalk.yellow('⚠️  接入点 ID 通常以 "ep-" 开头，请确认格式是否正确'));
+  }
+
+  setDoubaoEndpoint(endpoint);
+  console.log(chalk.green(`✅ 已设置豆包接入点 ID: ${endpoint}`));
+
+  // 检查是否已配置 API Key
+  const apiKey = getApiKey('doubao');
+  if (!apiKey) {
+    console.log(chalk.yellow('\n⚠️  尚未配置豆包 API Key'));
+    console.log(chalk.gray('  请运行: weeknote config key -p doubao -k <your-api-key>'));
+  } else {
+    console.log(chalk.green('\n✓ 豆包配置完成，可以使用豆包模型了'));
+  }
 }
 
 /**
@@ -261,10 +305,17 @@ export async function runConfigInit(): Promise<void> {
   const configuredPlatforms = getConfiguredPlatforms();
 
   // 1. 选择平台
+  const doubaoEndpoint = getDoubaoEndpoint();
+  const doubaoConfigured = configuredPlatforms.includes('doubao') && doubaoEndpoint;
+  
   const platformChoices = [
     {
       name: `硅基流动 ${chalk.green('[推荐，有免费额度]')}${configuredPlatforms.includes('siliconflow') ? chalk.green(' ✓ 已配置') : ''}`,
       value: 'siliconflow' as Platform,
+    },
+    {
+      name: `火山方舟（豆包）${doubaoConfigured ? chalk.green(' ✓ 已配置') : ''}`,
+      value: 'doubao' as Platform,
     },
     {
       name: `DeepSeek${configuredPlatforms.includes('deepseek') ? chalk.green(' ✓ 已配置') : ''}`,
@@ -338,6 +389,52 @@ export async function runConfigInit(): Promise<void> {
       console.log(chalk.green('✅ API Key 已保存'));
     }
 
+    // 2.5 豆包需要额外配置接入点 ID
+    if (platform === 'doubao') {
+      const existingEndpoint = getDoubaoEndpoint();
+      let endpoint = existingEndpoint;
+
+      if (existingEndpoint) {
+        const { useExistingEndpoint } = await inquirer.prompt<{ useExistingEndpoint: boolean }>([
+          {
+            type: 'confirm',
+            name: 'useExistingEndpoint',
+            message: `已有接入点 ID (${existingEndpoint})，是否使用现有的?`,
+            default: true,
+          },
+        ]);
+
+        if (!useExistingEndpoint) {
+          const { newEndpoint } = await inquirer.prompt<{ newEndpoint: string }>([
+            {
+              type: 'input',
+              name: 'newEndpoint',
+              message: '请输入接入点 ID (ep-xxxxx):',
+              validate: (value: string) => (value.trim() ? true : '接入点 ID 不能为空'),
+            },
+          ]);
+          endpoint = newEndpoint;
+          setDoubaoEndpoint(endpoint);
+          console.log(chalk.green('✅ 接入点 ID 已更新'));
+        }
+      } else {
+        console.log(chalk.gray('\n豆包需要在火山方舟控制台创建推理接入点'));
+        console.log(chalk.gray('创建接入点: https://console.volcengine.com/ark\n'));
+
+        const { newEndpoint } = await inquirer.prompt<{ newEndpoint: string }>([
+          {
+            type: 'input',
+            name: 'newEndpoint',
+            message: '请输入接入点 ID (ep-xxxxx):',
+            validate: (value: string) => (value.trim() ? true : '接入点 ID 不能为空'),
+          },
+        ]);
+        endpoint = newEndpoint;
+        setDoubaoEndpoint(endpoint!);
+        console.log(chalk.green('✅ 接入点 ID 已保存'));
+      }
+    }
+
     // 3. 选择默认模型
     const models = getModelsForPlatform(platform);
     const modelChoices = models.map((m) => {
@@ -393,6 +490,7 @@ export function runConfigShow(): void {
     { key: 'siliconflow', name: '硅基流动' },
     { key: 'deepseek', name: 'DeepSeek' },
     { key: 'openai', name: 'OpenAI' },
+    { key: 'doubao', name: '火山方舟（豆包）' },
   ];
 
   let hasAnyKey = false;
@@ -408,6 +506,18 @@ export function runConfigShow(): void {
     console.log(chalk.gray('  未配置任何 API Key'));
     console.log(chalk.gray('\n运行以下命令开始配置:'));
     console.log(chalk.gray('  weeknote config init'));
+  }
+
+  // 显示豆包接入点配置
+  const doubaoEndpoint = getDoubaoEndpoint();
+  if (config.apiKeys?.doubao) {
+    console.log(chalk.cyan('\n豆包接入点:'));
+    if (doubaoEndpoint) {
+      console.log(`  ${doubaoEndpoint}`);
+    } else {
+      console.log(chalk.yellow('  未配置（使用豆包需要配置接入点）'));
+      console.log(chalk.gray('  运行: weeknote config endpoint -e <your-endpoint-id>'));
+    }
   }
 
   console.log('');

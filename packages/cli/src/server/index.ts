@@ -59,14 +59,21 @@ function getApiConfig(overrideModelId?: string) {
       ? process.env.SILICONFLOW_API_KEY
       : platform === 'deepseek'
         ? process.env.DEEPSEEK_API_KEY
-        : process.env.OPENAI_API_KEY);
+        : platform === 'doubao'
+          ? (process.env.DOUBAO_API_KEY || process.env.ARK_API_KEY)
+          : process.env.OPENAI_API_KEY);
 
   if (!apiKey) {
     return null;
   }
 
+  // 豆包需要接入点 ID
+  const endpointId = platform === 'doubao' 
+    ? (config.doubaoEndpoint || process.env.DOUBAO_ENDPOINT || process.env.ARK_ENDPOINT)
+    : undefined;
+
   return {
-    primary: { modelId, apiKey },
+    primary: { modelId, apiKey, ...(endpointId ? { endpointId } : {}) },
   };
 }
 
@@ -118,6 +125,7 @@ export function createServer(): Express {
     const deepseekKey = config.apiKeys?.deepseek || process.env.DEEPSEEK_API_KEY || null;
     const openaiKey = config.apiKeys?.openai || process.env.OPENAI_API_KEY || null;
     const doubaoKey = config.apiKeys?.doubao || process.env.DOUBAO_API_KEY || process.env.ARK_API_KEY || null;
+    const doubaoEndpoint = config.doubaoEndpoint || process.env.DOUBAO_ENDPOINT || process.env.ARK_ENDPOINT || null;
 
     res.json({
       defaultModel: config.defaultModel || DEFAULT_MODEL,
@@ -127,13 +135,14 @@ export function createServer(): Express {
         openai: openaiKey,
         doubao: doubaoKey,
       },
+      doubaoEndpoint,
     });
   });
 
   // 保存配置
   app.post('/api/config', (req, res) => {
     try {
-      const { defaultModel, apiKeys } = req.body;
+      const { defaultModel, apiKeys, doubaoEndpoint } = req.body;
 
       // 验证模型 ID
       if (defaultModel && !isValidModelId(defaultModel)) {
@@ -153,6 +162,8 @@ export function createServer(): Express {
           ...(apiKeys?.openai && { openai: apiKeys.openai }),
           ...(apiKeys?.doubao && { doubao: apiKeys.doubao }),
         },
+        // 更新豆包接入点（如果提供了）
+        ...(doubaoEndpoint !== undefined && { doubaoEndpoint: doubaoEndpoint || undefined }),
       };
 
       saveConfig(newConfig);
