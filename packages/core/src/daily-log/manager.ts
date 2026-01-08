@@ -108,7 +108,17 @@ export class DailyLogManager {
     const fileName = getWeekFileName(date);
     const filePath = getWeekFilePath(fileName);
     const weekFile = await readWeekFile(filePath);
-    return weekFile?.days[date] || null;
+    const record = weekFile?.days[date];
+    if (!record) return null;
+    
+    // 确保字段类型正确（防止历史数据格式错误）
+    return {
+      ...record,
+      plan: typeof record.plan === 'string' ? record.plan : '',
+      result: typeof record.result === 'string' ? record.result : '',
+      issues: typeof record.issues === 'string' ? record.issues : '',
+      notes: typeof record.notes === 'string' ? record.notes : '',
+    };
   }
 
   /**
@@ -118,7 +128,26 @@ export class DailyLogManager {
     const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
     const fileName = getWeekFileName(dateStr);
     const filePath = getWeekFilePath(fileName);
-    return readWeekFile(filePath);
+    const weekFile = await readWeekFile(filePath);
+    
+    if (!weekFile) return null;
+    
+    // 确保所有天的字段类型正确（防止历史数据格式错误）
+    const sanitizedDays: Record<string, DailyRecord> = {};
+    for (const [dayKey, record] of Object.entries(weekFile.days)) {
+      sanitizedDays[dayKey] = {
+        ...record,
+        plan: typeof record.plan === 'string' ? record.plan : '',
+        result: typeof record.result === 'string' ? record.result : '',
+        issues: typeof record.issues === 'string' ? record.issues : '',
+        notes: typeof record.notes === 'string' ? record.notes : '',
+      };
+    }
+    
+    return {
+      ...weekFile,
+      days: sanitizedDays,
+    };
   }
 
   /**
