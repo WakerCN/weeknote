@@ -43,6 +43,10 @@ export interface ComboboxOption {
   label: string;
   icon?: React.ReactNode;
   tags?: ComboboxTag[];
+  /** 分组标识，用于分组归类 */
+  groupKey?: string;
+  /** 分组显示内容（支持 ReactNode），相同 groupKey 的选项会被归类在一起 */
+  groupLabel?: React.ReactNode;
 }
 
 interface ComboboxProps {
@@ -78,6 +82,38 @@ export function Combobox({
     const lowerSearch = search.toLowerCase();
     return options.filter((option) => option.label.toLowerCase().includes(lowerSearch));
   }, [options, search]);
+
+  // 按分组组织选项
+  const groupedOptions = React.useMemo(() => {
+    const groups = new Map<string | undefined, ComboboxOption[]>();
+    const groupLabels = new Map<string | undefined, React.ReactNode>();
+    
+    for (const option of filteredOptions) {
+      const groupKey = option.groupKey;
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, []);
+        groupLabels.set(groupKey, option.groupLabel);
+      }
+      groups.get(groupKey)!.push(option);
+    }
+    
+    // 转换为数组，保持原有顺序
+    const result: Array<{ groupKey: string | undefined; groupLabel: React.ReactNode; options: ComboboxOption[] }> = [];
+    const seenGroups = new Set<string | undefined>();
+    
+    for (const option of filteredOptions) {
+      if (!seenGroups.has(option.groupKey)) {
+        seenGroups.add(option.groupKey);
+        result.push({
+          groupKey: option.groupKey,
+          groupLabel: groupLabels.get(option.groupKey),
+          options: groups.get(option.groupKey)!,
+        });
+      }
+    }
+    
+    return result;
+  }, [filteredOptions]);
 
   // 打开时聚焦输入框
   React.useEffect(() => {
@@ -126,7 +162,7 @@ export function Combobox({
           aria-expanded={open}
           disabled={disabled}
           className={cn(
-            'flex h-10 w-full items-center justify-between rounded-lg border border-[#30363d] bg-[#21262d] px-3 py-2 text-sm text-[#f0f6fc] ring-offset-background placeholder:text-[#8b949e] focus:outline-none focus:ring-2 focus:ring-[#58a6ff] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+            'flex h-10 w-full items-center justify-between rounded-lg border border-[#30363d] bg-[#21262d] px-3 py-2 text-sm text-[#f0f6fc] placeholder:text-[#8b949e] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50',
             className
           )}
         >
@@ -160,35 +196,51 @@ export function Combobox({
           {filteredOptions.length === 0 ? (
             <div className="py-6 text-center text-sm text-[#8b949e]">{emptyText}</div>
           ) : (
-            filteredOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                onClick={() => handleSelect(option)}
-                className={cn(
-                  'relative flex w-full cursor-pointer select-none items-center rounded-md px-2 py-2 text-sm outline-none transition-colors',
-                  'hover:bg-[#21262d] focus:bg-[#21262d]',
-                  value === option.value && 'bg-[#21262d]'
+            groupedOptions.map(({ groupKey, groupLabel, options: groupOptions }, groupIdx) => (
+              <div key={groupKey ?? '__ungrouped__'}>
+                {/* 分组标题 */}
+                {groupLabel && (
+                  <div
+                    className={cn(
+                      'px-2 py-1.5 text-xs font-medium text-[#8b949e] select-none flex items-center gap-1.5',
+                      groupIdx > 0 && 'mt-2 border-t border-[#30363d] pt-2'
+                    )}
+                  >
+                    {groupLabel}
+                  </div>
                 )}
-              >
-                <Check
-                  className={cn(
-                    'mr-2 h-4 w-4 text-emerald-400 transition-opacity shrink-0',
-                    value === option.value ? 'opacity-100' : 'opacity-0'
-                  )}
-                />
-                {option.icon && <span className="mr-2 shrink-0">{option.icon}</span>}
-                <span className="truncate flex-1">{option.label}</span>
-                {option.tags && option.tags.length > 0 && (
-                  <span className="ml-2 flex items-center gap-1 shrink-0">
-                    {option.tags.map((tag, idx) => (
-                      <span key={idx} className={getTagClassName(tag.variant)}>
-                        {tag.text}
+                {/* 分组内的选项 */}
+                {groupOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => handleSelect(option)}
+                    className={cn(
+                      'relative flex w-full cursor-pointer select-none items-center rounded-md px-2 py-2 text-sm outline-none transition-colors',
+                      'hover:bg-[#21262d] focus:bg-[#21262d]',
+                      value === option.value && 'bg-[#21262d]'
+                    )}
+                  >
+                    <Check
+                      className={cn(
+                        'mr-2 h-4 w-4 text-emerald-400 transition-opacity shrink-0',
+                        value === option.value ? 'opacity-100' : 'opacity-0'
+                      )}
+                    />
+                    {option.icon && <span className="mr-2 shrink-0">{option.icon}</span>}
+                    <span className="truncate flex-1 text-left">{option.label}</span>
+                    {option.tags && option.tags.length > 0 && (
+                      <span className="ml-2 flex items-center gap-1 shrink-0">
+                        {option.tags.map((tag, idx) => (
+                          <span key={idx} className={getTagClassName(tag.variant)}>
+                            {tag.text}
+                          </span>
+                        ))}
                       </span>
-                    ))}
-                  </span>
-                )}
-              </button>
+                    )}
+                  </button>
+                ))}
+              </div>
             ))
           )}
         </div>
