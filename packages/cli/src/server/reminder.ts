@@ -58,10 +58,14 @@ router.get('/', (_req, res) => {
  */
 router.put('/', (req, res) => {
   try {
-    const { enabled, sendKey, schedules } = req.body;
+    const { enabled, sendKey: rawSendKey, schedules } = req.body;
+
+    // 对 SendKey 进行 trim 处理，避免空白字符导致的问题
+    const sendKey =
+      typeof rawSendKey === 'string' ? rawSendKey.trim() : rawSendKey;
 
     // 验证 SendKey 格式（Server酱的 SendKey 以 SCT 开头）
-    if (sendKey && typeof sendKey === 'string' && sendKey.trim()) {
+    if (sendKey && typeof sendKey === 'string' && sendKey.length > 0) {
       if (!sendKey.startsWith('SCT')) {
         return res.status(400).json({
           error: '无效的 SendKey，Server酱的 SendKey 应以 SCT 开头',
