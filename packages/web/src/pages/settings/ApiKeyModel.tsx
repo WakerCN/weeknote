@@ -6,12 +6,33 @@ import { useState } from 'react';
 import { useRequest } from 'ahooks';
 import { toast } from 'sonner';
 import { getModels, getConfig, saveConfig, deleteApiKey, type ModelInfo, type Platform, type AppConfig } from '../../api';
+import VolcengineLogo from '../../assets/logos/volcengine.svg';
+import DeepSeekLogo from '../../assets/logos/deepseek.svg';
+import OpenAILogo from '../../assets/logos/openai.svg';
+
+// 平台 Logo 组件
+const PlatformLogo = ({ platform, className = 'w-5 h-5' }: { platform: Platform; className?: string }) => {
+  const logos: Record<Platform, React.ReactNode> = {
+    doubao: <img src={VolcengineLogo} alt="火山方舟" className={className} />,
+    deepseek: <img src={DeepSeekLogo} alt="DeepSeek" className={className} />,
+    openai: <img src={OpenAILogo} alt="OpenAI" className={className} />,
+    siliconflow: (
+      <img 
+        src="https://cloud.siliconflow.cn/favicon.ico" 
+        alt="硅基流动" 
+        className={className}
+      />
+    ),
+  };
+  return <>{logos[platform]}</>;
+};
 
 // 平台信息
 const PLATFORMS: Array<{ key: Platform; name: string; url: string }> = [
   { key: 'siliconflow', name: '硅基流动', url: 'https://cloud.siliconflow.cn/' },
   { key: 'deepseek', name: 'DeepSeek', url: 'https://platform.deepseek.com/' },
   { key: 'openai', name: 'OpenAI', url: 'https://platform.openai.com/' },
+  { key: 'doubao', name: '火山方舟（豆包）', url: 'https://console.volcengine.com/ark' },
 ];
 
 // 脱敏 API Key（显示前4位和后4位）
@@ -22,12 +43,14 @@ function maskApiKey(key: string): string {
 
 // API Key 卡片组件
 function ApiKeyCard({
+  platform,
   name,
   url,
   apiKey,
   onSave,
   onDelete,
 }: {
+  platform: Platform;
   name: string;
   url: string;
   apiKey: string | null;
@@ -75,6 +98,7 @@ function ApiKeyCard({
     <div className="p-4 bg-[#0d1117] rounded-lg border border-[#30363d]">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
+          <PlatformLogo platform={platform} />
           <span className="font-medium text-[#f0f6fc]">{name}</span>
           {isConfigured && !isEditing ? (
             <span className="text-xs text-emerald-400">✓ 已配置</span>
@@ -207,7 +231,7 @@ export default function ApiKeyModel() {
   const { data: configData, loading: configLoading, refresh: refreshConfig } = useRequest(getConfig);
 
   const models = modelsData?.models || [];
-  const config: AppConfig = configData || { defaultModel: null, apiKeys: { siliconflow: null, deepseek: null, openai: null } };
+  const config: AppConfig = configData || { defaultModel: null, apiKeys: { siliconflow: null, deepseek: null, openai: null, doubao: null } };
   
   // 只在首次加载（还没有任何数据）时显示全屏 loading
   // 刷新时不显示，避免滚动位置丢失
@@ -217,6 +241,7 @@ export default function ApiKeyModel() {
   const getPlatform = (modelId: string): Platform => {
     if (modelId.startsWith('siliconflow/')) return 'siliconflow';
     if (modelId.startsWith('deepseek/')) return 'deepseek';
+    if (modelId.startsWith('doubao/')) return 'doubao';
     return 'openai';
   };
 
@@ -295,6 +320,7 @@ export default function ApiKeyModel() {
               {PLATFORMS.map(({ key, name, url }) => (
                 <ApiKeyCard
                   key={key}
+                  platform={key}
                   name={name}
                   url={url}
                   apiKey={config.apiKeys[key]}
@@ -312,118 +338,80 @@ export default function ApiKeyModel() {
               点击选择生成周报时使用的默认模型，选择后立即生效。
             </p>
 
-            {/* 免费模型 */}
-            <div className="mb-6">
-              <h4 className="text-sm font-medium text-emerald-400 mb-3">免费模型</h4>
-              <div className="grid gap-3">
-                {models
-                  .filter((m: ModelInfo) => m.isFree)
-                  .map((model: ModelInfo) => {
-                    const platform = getPlatform(model.id);
-                    const isConfigured = isPlatformConfigured(platform);
-                    const isSelected = config.defaultModel === model.id;
-                    const isSwitching = switchingModel === model.id;
+            {/* 按平台分组显示模型 */}
+            <div className="space-y-6">
+              {(['doubao', 'deepseek', 'openai', 'siliconflow'] as Platform[]).map((platformKey) => {
+                const platformModels = models.filter((m: ModelInfo) => getPlatform(m.id) === platformKey);
+                if (platformModels.length === 0) return null;
 
-                    return (
-                      <button
-                        key={model.id}
-                        onClick={() => handleSwitchModel(model.id)}
-                        disabled={isSwitching || isSelected}
-                        className={`
-                          w-full p-4 rounded-lg border text-left transition-all duration-200 relative
-                          ${
-                            isSelected
-                              ? 'bg-emerald-500/10 border-emerald-500/50'
-                              : 'bg-[#0d1117] border-[#30363d] hover:border-[#484f58]'
-                          }
-                          ${isSwitching ? 'opacity-70' : ''}
-                        `}
-                      >
-                        {isSwitching && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117]/50 rounded-lg">
-                            <span className="text-sm text-[#8b949e]">切换中...</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium text-[#f0f6fc]">
-                              {model.name}
-                              {isSelected && (
-                                <span className="ml-2 text-xs text-emerald-400">● 当前默认</span>
-                              )}
-                            </div>
-                            <div className="text-sm text-[#8b949e] mt-1">{model.description}</div>
-                            <div className="text-xs text-[#484f58] mt-1">{model.id}</div>
-                          </div>
-                          <div className="text-right">
-                            {isConfigured ? (
-                              <span className="text-xs text-emerald-400">可用</span>
-                            ) : (
-                              <span className="text-xs text-yellow-400">需配置 Key</span>
+                const platformNames: Record<Platform, string> = {
+                  doubao: '火山方舟（豆包）',
+                  deepseek: 'DeepSeek',
+                  openai: 'OpenAI',
+                  siliconflow: '硅基流动（免费）',
+                };
+
+                return (
+                  <div key={platformKey}>
+                    <h4 className="text-sm font-medium text-[#8b949e] mb-3 flex items-center gap-2">
+                      <PlatformLogo platform={platformKey} className="w-4 h-4" />
+                      <span>{platformNames[platformKey]}</span>
+                    </h4>
+                    <div className="grid gap-3">
+                      {platformModels.map((model: ModelInfo) => {
+                        const isConfigured = isPlatformConfigured(platformKey);
+                        const isSelected = config.defaultModel === model.id;
+                        const isSwitching = switchingModel === model.id;
+
+                        return (
+                          <button
+                            key={model.id}
+                            onClick={() => handleSwitchModel(model.id)}
+                            disabled={isSwitching || isSelected}
+                            className={`
+                              w-full p-4 rounded-lg border text-left transition-all duration-200 relative
+                              ${
+                                isSelected
+                                  ? 'bg-blue-500/10 border-blue-500/50'
+                                  : 'bg-[#0d1117] border-[#30363d] hover:border-[#484f58]'
+                              }
+                              ${isSwitching ? 'opacity-70' : ''}
+                            `}
+                          >
+                            {isSwitching && (
+                              <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117]/50 rounded-lg">
+                                <span className="text-sm text-[#8b949e]">切换中...</span>
+                              </div>
                             )}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-              </div>
-            </div>
-
-            {/* 收费模型 */}
-            <div>
-              <h4 className="text-sm font-medium text-yellow-400 mb-3">收费模型</h4>
-              <div className="grid gap-3">
-                {models
-                  .filter((m: ModelInfo) => !m.isFree)
-                  .map((model: ModelInfo) => {
-                    const platform = getPlatform(model.id);
-                    const isConfigured = isPlatformConfigured(platform);
-                    const isSelected = config.defaultModel === model.id;
-                    const isSwitching = switchingModel === model.id;
-
-                    return (
-                      <button
-                        key={model.id}
-                        onClick={() => handleSwitchModel(model.id)}
-                        disabled={isSwitching || isSelected}
-                        className={`
-                          w-full p-4 rounded-lg border text-left transition-all duration-200 relative
-                          ${
-                            isSelected
-                              ? 'bg-yellow-500/10 border-yellow-500/50'
-                              : 'bg-[#0d1117] border-[#30363d] hover:border-[#484f58]'
-                          }
-                          ${isSwitching ? 'opacity-70' : ''}
-                        `}
-                      >
-                        {isSwitching && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-[#0d1117]/50 rounded-lg">
-                            <span className="text-sm text-[#8b949e]">切换中...</span>
-                          </div>
-                        )}
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium text-[#f0f6fc]">
-                              {model.name}
-                              {isSelected && (
-                                <span className="ml-2 text-xs text-yellow-400">● 当前默认</span>
-                              )}
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-medium text-[#f0f6fc] flex items-center gap-2">
+                                  {model.name}
+                                  {model.isFree && (
+                                    <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">免费</span>
+                                  )}
+                                  {isSelected && (
+                                    <span className="text-xs text-blue-400">● 当前默认</span>
+                                  )}
+                                </div>
+                                <div className="text-sm text-[#8b949e] mt-1">{model.description}</div>
+                                <div className="text-xs text-[#484f58] mt-1">{model.id}</div>
+                              </div>
+                              <div className="text-right">
+                                {isConfigured ? (
+                                  <span className="text-xs text-emerald-400">可用</span>
+                                ) : (
+                                  <span className="text-xs text-yellow-400">需配置 Key</span>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-sm text-[#8b949e] mt-1">{model.description}</div>
-                            <div className="text-xs text-[#484f58] mt-1">{model.id}</div>
-                          </div>
-                          <div className="text-right">
-                            {isConfigured ? (
-                              <span className="text-xs text-emerald-400">可用</span>
-                            ) : (
-                              <span className="text-xs text-yellow-400">需配置 Key</span>
-                            )}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-              </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
         </div>
