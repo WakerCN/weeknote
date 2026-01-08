@@ -15,16 +15,18 @@ import '@milkdown/crepe/theme/frame-dark.css';
 /**
  * 创建任务列表输入规则的 ProseMirror 插件
  * 支持 [] 或 [ ] + 空格转换为任务列表
+ * 
+ * 实现思路：
+ * 1. 删除匹配的 "[] " 文本
+ * 2. 将当前段落包装为任务列表项（设置 checked 属性）
  */
 const createTaskListInputRulePlugin = $prose(() => {
-  // 创建输入规则：匹配行首的 [] 或 [ ] 后跟空格
   const taskListRule = new InputRule(
-    /^\s*\[(\s|x|X)?\]\s$/,
+    /^\s*\[(\s|x|X)?\] $/,
     (state, match, start, end) => {
       const { tr, schema } = state;
       const isChecked = match[1]?.toLowerCase() === 'x';
       
-      // 获取需要的节点类型
       const listItemType = schema.nodes.list_item;
       const bulletListType = schema.nodes.bullet_list;
       const paragraphType = schema.nodes.paragraph;
@@ -33,30 +35,40 @@ const createTaskListInputRulePlugin = $prose(() => {
         return null;
       }
       
-      // 创建一个带有 checked 属性的列表项（任务列表）
-      const paragraph = paragraphType.create();
-      const listItem = listItemType.create(
-        { checked: isChecked },
-        paragraph
-      );
+      // 解析位置
+      const $start = state.doc.resolve(start);
+      let blockDepth = $start.depth;
+      while (blockDepth > 0 && !$start.node(blockDepth).type.isBlock) {
+        blockDepth--;
+      }
+      if (blockDepth === 0) return null;
+      
+      const blockStart = $start.before(blockDepth);
+      const blockEnd = $start.after(blockDepth);
+      
+      // 获取当前段落除了 "[] " 之外的剩余内容
+      const $end = state.doc.resolve(end);
+      const contentAfterMatch = $end.parent.cut($end.parentOffset);
+      
+      // 创建段落内容：如果有剩余文本就用它，否则创建空节点
+      const paragraphContent = contentAfterMatch.content.size > 0 
+        ? paragraphType.create(null, contentAfterMatch.content)
+        : paragraphType.create();
+      
+      // 创建任务列表结构
+      const listItem = listItemType.create({ checked: isChecked }, paragraphContent);
       const bulletList = bulletListType.create(null, listItem);
       
-      // 获取当前行的起始位置
-      const $start = state.doc.resolve(start);
-      const lineStart = $start.start();
+      // 替换整个段落为任务列表
+      tr.replaceWith(blockStart, blockEnd, bulletList);
       
-      // 替换整行内容为任务列表
-      tr.replaceWith(lineStart, end, bulletList);
-      
-      // 将光标移动到列表项的段落内
-      const newPos = lineStart + 3; // bulletList + listItem + paragraph 的偏移
-      tr.setSelection(TextSelection.create(tr.doc, newPos));
+      // 将光标移到列表项内容开始处
+      tr.setSelection(TextSelection.create(tr.doc, blockStart + 3));
       
       return tr;
     }
   );
 
-  // 返回 inputRules 插件
   return inputRules({ rules: [taskListRule] });
 });
 
