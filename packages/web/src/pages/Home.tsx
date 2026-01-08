@@ -10,6 +10,9 @@ import { toast } from 'sonner';
 import { FileText, Calendar } from 'lucide-react';
 import SyncScrollEditor from '../components/SyncScrollEditor';
 import PromptPanel from '../components/PromptPanel';
+import VolcengineLogo from '../assets/logos/volcengine.svg';
+import DeepSeekLogo from '../assets/logos/deepseek.svg';
+import OpenAILogo from '../assets/logos/openai.svg';
 import {
   generateReportStream,
   getModels,
@@ -136,13 +139,54 @@ export default function Home() {
   const getPlatform = (modelId: string): Platform => {
     if (modelId.startsWith('siliconflow/')) return 'siliconflow';
     if (modelId.startsWith('deepseek/')) return 'deepseek';
+    if (modelId.startsWith('doubao/')) return 'doubao';
     return 'openai';
+  };
+
+  // 平台 Logo 图标组件 - 使用本地 SVG 文件（正方形）
+  const PlatformLogo = ({ platform }: { platform: Platform }) => {
+    const logos: Record<Platform, React.ReactNode> = {
+      // 火山方舟（豆包）
+      doubao: <img src={VolcengineLogo} alt="火山方舟" className="w-4 h-4" />,
+      // DeepSeek
+      deepseek: <img src={DeepSeekLogo} alt="DeepSeek" className="w-4 h-4" />,
+      // OpenAI
+      openai: <img src={OpenAILogo} alt="OpenAI" className="w-4 h-4" />,
+      // 硅基流动
+      siliconflow: (
+        <img 
+          src="https://cloud.siliconflow.cn/favicon.ico" 
+          alt="硅基流动" 
+          className="w-4 h-4"
+        />
+      ),
+    };
+    return <>{logos[platform]}</>;
+  };
+
+  // 获取平台分组信息
+  const getPlatformGroup = (platform: Platform): { key: string; label: React.ReactNode } => {
+    const names: Record<Platform, string> = {
+      doubao: '火山方舟（豆包）',
+      deepseek: 'DeepSeek',
+      openai: 'OpenAI',
+      siliconflow: '硅基流动（免费）',
+    };
+    return {
+      key: platform,
+      label: (
+        <span className="flex items-center gap-1.5">
+          <PlatformLogo platform={platform} />
+          <span>{names[platform]}</span>
+        </span>
+      ),
+    };
   };
 
   // 将模型列表转换为 Combobox 选项格式
   const modelOptions: ComboboxOption[] = useMemo(() => {
     const models = modelsData?.models || [];
-    const apiKeys = configData?.apiKeys || { siliconflow: null, deepseek: null, openai: null };
+    const apiKeys = configData?.apiKeys || { siliconflow: null, deepseek: null, openai: null, doubao: null };
     const defaultModel = configData?.defaultModel;
 
     return models.map((model: ModelInfo) => {
@@ -165,11 +209,14 @@ export default function Home() {
         tags.push({ text: '需配置', variant: 'warning' });
       }
 
+      const groupInfo = getPlatformGroup(platform);
       return {
         value: model.id,
         label: model.name,
-        icon: <span>{model.isFree ? '🆓' : '💰'}</span>,
+        icon: <PlatformLogo platform={platform} />,
         tags,
+        groupKey: groupInfo.key,
+        groupLabel: groupInfo.label,
       };
     });
   }, [modelsData?.models, configData?.apiKeys, configData?.defaultModel]);
@@ -332,17 +379,33 @@ export default function Home() {
 
         {/* 生成按钮区 */}
         <div className="flex items-center justify-center gap-4 py-2">
-          {/* 模型选择器 */}
-          <Combobox
-            options={modelOptions}
-            value={selectedModelId}
-            onValueChange={setSelectedModelId}
-            placeholder={modelOptions.length === 0 ? '加载中...' : '选择模型'}
-            searchPlaceholder="搜索模型..."
-            emptyText="未找到模型"
-            disabled={isGenerating}
-            className="w-[280px]"
-          />
+          {/* 模型选择器 - 带付费标签 */}
+          <div className="flex items-center gap-2">
+            <Combobox
+              options={modelOptions}
+              value={selectedModelId}
+              onValueChange={setSelectedModelId}
+              placeholder={modelOptions.length === 0 ? '加载中...' : '选择模型'}
+              searchPlaceholder="搜索模型..."
+              emptyText="未找到模型"
+              disabled={isGenerating}
+              className="w-[280px]"
+            />
+            {/* 付费状态标签 */}
+            {selectedModelId && (
+              <span
+                className={`px-3 py-2.5 rounded-lg text-sm font-medium ${
+                  modelsData?.models?.find((m: ModelInfo) => m.id === selectedModelId)?.isFree
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'bg-amber-500/20 text-amber-400'
+                }`}
+              >
+                {modelsData?.models?.find((m: ModelInfo) => m.id === selectedModelId)?.isFree
+                  ? '免费'
+                  : '付费'}
+              </span>
+            )}
+          </div>
 
           {/* 查看 Prompt 按钮 */}
           <button
