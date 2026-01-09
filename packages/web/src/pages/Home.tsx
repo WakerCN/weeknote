@@ -103,8 +103,11 @@ export default function Home() {
   const [isThinkingExpanded, setIsThinkingExpanded] = useState(true); // 控制思考区域折叠/展开
   const thinkingScrollRef = useRef<HTMLDivElement>(null);
   
-  // 判断当前模型是否是推理模型
-  const isReasoningModel = selectedModelId.startsWith('doubao/seed-');
+  // 判断当前模型是否是推理模型（豆包 Seed 或 DeepSeek R1）
+  const isReasoningModel = selectedModelId.startsWith('doubao/seed-') || selectedModelId === 'deepseek/deepseek-reasoner';
+  
+  // 判断是否支持切换思考模式（豆包 Seed 支持，DeepSeek R1 不支持禁用思考）
+  const supportsThinkingToggle = selectedModelId.startsWith('doubao/seed-');
 
   // 思考内容更新时自动滚动到底部
   useEffect(() => {
@@ -288,7 +291,11 @@ export default function Home() {
       setReport('');
       setModelInfo(null);
       setThinkingContent('');
-      setIsThinking(isReasoningModel && thinkingMode !== 'disabled');
+      
+      // DeepSeek R1 不支持禁用思考，始终为 enabled
+      const isDeepSeekR1 = selectedModelId === 'deepseek/deepseek-reasoner';
+      const effectiveThinkingMode = isDeepSeekR1 ? 'enabled' : thinkingMode;
+      setIsThinking(isReasoningModel && effectiveThinkingMode !== 'disabled');
 
       const result = await generateReportStream({
         dailyLog,
@@ -303,7 +310,7 @@ export default function Home() {
         },
         signal: abortControllerRef.current.signal,
         modelId: selectedModelId || undefined,
-        thinkingMode: isReasoningModel ? thinkingMode : undefined,
+        thinkingMode: isReasoningModel ? effectiveThinkingMode : undefined,
       });
 
       setIsThinking(false);
@@ -445,8 +452,8 @@ export default function Home() {
             )}
           </div>
 
-          {/* 推理模式开关 - 仅对豆包 Seed 模型显示 */}
-          {isReasoningModel && (
+          {/* 推理模式开关 - 仅对支持切换的模型（豆包 Seed）显示 */}
+          {supportsThinkingToggle && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setThinkingMode(thinkingMode === 'disabled' ? 'enabled' : 'disabled')}
@@ -464,6 +471,14 @@ export default function Home() {
                 <span className="text-base">{thinkingMode !== 'disabled' ? '🧠' : '⚡'}</span>
                 <span>{thinkingMode !== 'disabled' ? '深度推理' : '快速模式'}</span>
               </button>
+            </div>
+          )}
+          
+          {/* DeepSeek R1 推理模型提示（不支持禁用思考） */}
+          {selectedModelId === 'deepseek/deepseek-reasoner' && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30">
+              <span className="text-base">🧠</span>
+              <span>深度推理</span>
             </div>
           )}
 

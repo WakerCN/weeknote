@@ -8,7 +8,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import type { RequestInit } from 'node-fetch';
 import nodeFetch from 'node-fetch';
 import type { ChatMessage, LLMProvider, ModelConfig, ModelId, StreamCallbacks } from '../types.js';
-import { GeneratorError, MODEL_REGISTRY, isReasoningModel } from '../types.js';
+import { GeneratorError, MODEL_REGISTRY } from '../types.js';
 
 /**
  * 获取代理 URL
@@ -225,11 +225,12 @@ export class OpenAICompatibleProvider implements LLMProvider {
       : callbacks;
 
     try {
-      // 构建额外的请求参数（豆包 Seed 推理模型支持 thinking 参数）
-      // 注意：豆包只支持 enabled 和 disabled，不支持 auto
+      // 构建额外的请求参数
+      // 注意：豆包 Seed 需要 thinking 参数来控制思考模式，只支持 enabled 和 disabled
+      // DeepSeek R1 不需要额外参数，会自动返回 reasoning_content
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const extraParams: Record<string, any> = {};
-      if (isReasoningModel(this.modelId) && config.thinkingMode && config.thinkingMode !== 'auto') {
+      if (this.modelId.startsWith('doubao/seed-') && config.thinkingMode && config.thinkingMode !== 'auto') {
         extraParams.thinking = {
           type: config.thinkingMode,
         };
@@ -250,7 +251,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
         const delta = chunk.choices[0]?.delta;
         if (!delta) continue;
 
-        // 处理思考内容（豆包 Seed 模型特有）
+        // 处理思考内容（豆包 Seed 和 DeepSeek R1 都通过 reasoning_content 返回）
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const reasoningContent = (delta as any).reasoning_content;
         if (reasoningContent && onThinking) {

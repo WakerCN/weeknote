@@ -12,6 +12,7 @@ export type ModelId =
   | 'doubao/seed-1.6' // 推理模型
   // DeepSeek 官方
   | 'deepseek/deepseek-chat'
+  | 'deepseek/deepseek-reasoner' // 推理模型
   // OpenAI
   | 'openai/gpt-4o'
   | 'openai/gpt-4o-mini'
@@ -67,6 +68,14 @@ export const MODEL_REGISTRY: Record<ModelId, ModelMeta> = {
     baseUrl: 'https://api.deepseek.com',
     isFree: false,
     description: 'DeepSeek 官方 API，性价比高',
+  },
+  'deepseek/deepseek-reasoner': {
+    id: 'deepseek/deepseek-reasoner',
+    name: 'DeepSeek R1 (推理)',
+    apiModel: 'deepseek-reasoner',
+    baseUrl: 'https://api.deepseek.com',
+    isFree: false,
+    description: '推理模型，深度思考后输出，效果更好',
   },
   // OpenAI
   'openai/gpt-4o': {
@@ -146,7 +155,7 @@ export function isValidModelId(modelId: string): modelId is ModelId {
 }
 
 /**
- * 思考模式类型（仅适用于豆包 Seed 推理模型）
+ * 思考模式类型（适用于推理模型：豆包 Seed、DeepSeek R1）
  */
 export type ThinkingMode = 'enabled' | 'disabled' | 'auto';
 
@@ -154,7 +163,7 @@ export type ThinkingMode = 'enabled' | 'disabled' | 'auto';
  * 检查模型是否支持推理模式
  */
 export function isReasoningModel(modelId: ModelId): boolean {
-  return modelId.startsWith('doubao/seed-');
+  return modelId.startsWith('doubao/seed-') || modelId === 'deepseek/deepseek-reasoner';
 }
 
 /**
@@ -181,7 +190,7 @@ export interface ModelConfig {
   temperature?: number;
   /** 接入点 ID（火山方舟/豆包必需，格式如 ep-xxxxx） */
   endpointId?: string;
-  /** 思考模式（仅豆包 Seed 推理模型支持，默认 auto） */
+  /** 思考模式（推理模型支持：豆包 Seed、DeepSeek R1，默认 auto） */
   thinkingMode?: ThinkingMode;
 }
 

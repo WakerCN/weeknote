@@ -16,6 +16,7 @@ import {
   MODEL_REGISTRY,
   DEFAULT_MODEL,
   isValidModelId,
+  isReasoningModel,
   type ModelId,
   type ValidationWarning,
   type StreamCallbacks,
@@ -473,8 +474,8 @@ export function createServer(): Express {
 
       const weeklyLog = parseDailyLog(dailyLog);
 
-      // 判断是否是推理模型
-      const isReasoning = config.primary.modelId.startsWith('doubao/seed-');
+      // 判断是否是推理模型（豆包 Seed 或 DeepSeek R1）
+      const isReasoning = isReasoningModel(config.primary.modelId);
       const thinkingEnabled = isReasoning && thinkingMode !== 'disabled';
 
       console.log(
