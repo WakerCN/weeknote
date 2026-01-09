@@ -133,6 +133,33 @@ export interface GenerateStreamResult {
 }
 
 /**
+ * 思考模式类型（仅适用于豆包 Seed 推理模型）
+ */
+export type ThinkingMode = 'enabled' | 'disabled' | 'auto';
+
+/**
+ * 流式生成回调
+ */
+export interface StreamCallbacks {
+  /** 内容块回调 */
+  onChunk: (chunk: string) => void;
+  /** 思考过程回调（仅推理模型支持） */
+  onThinking?: (thinking: string) => void;
+}
+
+/**
+ * 流式生成选项
+ */
+export interface GenerateStreamOptions {
+  dailyLog: string;
+  callbacks: StreamCallbacks;
+  signal?: AbortSignal;
+  modelId?: string;
+  /** 思考模式（仅豆包 Seed 推理模型支持） */
+  thinkingMode?: ThinkingMode;
+}
+
+/**
  * 流式生成周报
  * @param dailyLog 日志内容
  * @param onChunk 每个 chunk 的回调
@@ -145,12 +172,55 @@ export async function generateReportStream(
   onChunk: (chunk: string) => void,
   signal?: AbortSignal,
   modelId?: string
+): Promise<GenerateStreamResult>;
+
+/**
+ * 流式生成周报（支持思考过程回调）
+ * @param options 生成选项
+ * @returns 最终结果（包含模型信息和可能的警告）
+ */
+export async function generateReportStream(
+  options: GenerateStreamOptions
+): Promise<GenerateStreamResult>;
+
+// 实现
+export async function generateReportStream(
+  dailyLogOrOptions: string | GenerateStreamOptions,
+  onChunk?: (chunk: string) => void,
+  signal?: AbortSignal,
+  modelId?: string
 ): Promise<GenerateStreamResult> {
+  // 解析参数
+  let dailyLog: string;
+  let callbacks: StreamCallbacks;
+  let abortSignal: AbortSignal | undefined;
+  let selectedModelId: string | undefined;
+  let thinkingMode: ThinkingMode | undefined;
+
+  if (typeof dailyLogOrOptions === 'string') {
+    // 旧的调用方式
+    dailyLog = dailyLogOrOptions;
+    callbacks = { onChunk: onChunk! };
+    abortSignal = signal;
+    selectedModelId = modelId;
+  } else {
+    // 新的调用方式
+    dailyLog = dailyLogOrOptions.dailyLog;
+    callbacks = dailyLogOrOptions.callbacks;
+    abortSignal = dailyLogOrOptions.signal;
+    selectedModelId = dailyLogOrOptions.modelId;
+    thinkingMode = dailyLogOrOptions.thinkingMode;
+  }
+
   const response = await fetch('/api/generate/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dailyLog, modelId }),
-    signal,
+    body: JSON.stringify({ 
+      dailyLog, 
+      modelId: selectedModelId,
+      ...(thinkingMode ? { thinkingMode } : {}),
+    }),
+    signal: abortSignal,
   });
 
   if (!response.ok) {
@@ -182,8 +252,14 @@ export async function generateReportStream(
         try {
           const data = JSON.parse(line.slice(6));
 
+          // 处理思考内容
+          if (data.thinking && callbacks.onThinking) {
+            callbacks.onThinking(data.thinking);
+          }
+
+          // 处理正常内容
           if (data.chunk) {
-            onChunk(data.chunk);
+            callbacks.onChunk(data.chunk);
           }
 
           if (data.done) {

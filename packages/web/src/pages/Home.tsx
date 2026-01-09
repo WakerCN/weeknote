@@ -7,7 +7,7 @@ import { useState, useRef, useMemo, useEffect } from 'react';
 import { useRequest } from 'ahooks';
 import { useTransitionNavigate } from '../lib/navigation';
 import { toast } from 'sonner';
-import { FileText, Calendar } from 'lucide-react';
+import { FileText, Calendar, StopCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import SyncScrollEditor from '../components/SyncScrollEditor';
 import PromptPanel from '../components/PromptPanel';
 import VolcengineLogo from '../assets/logos/volcengine.svg';
@@ -21,6 +21,7 @@ import {
   type ModelInfo,
   type Platform,
   type ValidationWarning,
+  type ThinkingMode,
 } from '../api';
 import { Combobox, type ComboboxOption, type ComboboxTag } from '@/components/ui/combobox';
 
@@ -94,6 +95,23 @@ export default function Home() {
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [showPromptPanel, setShowPromptPanel] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // 推理模式相关状态
+  const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('enabled');
+  const [thinkingContent, setThinkingContent] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+  const [isThinkingExpanded, setIsThinkingExpanded] = useState(true); // 控制思考区域折叠/展开
+  const thinkingScrollRef = useRef<HTMLDivElement>(null);
+  
+  // 判断当前模型是否是推理模型
+  const isReasoningModel = selectedModelId.startsWith('doubao/seed-');
+
+  // 思考内容更新时自动滚动到底部
+  useEffect(() => {
+    if (thinkingScrollRef.current && isThinking) {
+      thinkingScrollRef.current.scrollTop = thinkingScrollRef.current.scrollHeight;
+    }
+  }, [thinkingContent, isThinking]);
 
   // 检查是否有从每日记录页导入的数据
   useEffect(() => {
@@ -269,14 +287,26 @@ export default function Home() {
       abortControllerRef.current = new AbortController();
       setReport('');
       setModelInfo(null);
+      setThinkingContent('');
+      setIsThinking(isReasoningModel && thinkingMode !== 'disabled');
 
-      const result = await generateReportStream(
+      const result = await generateReportStream({
         dailyLog,
-        (chunk) => setReport((prev) => prev + chunk),
-        abortControllerRef.current.signal,
-        selectedModelId || undefined
-      );
+        callbacks: {
+          onChunk: (chunk) => {
+            setIsThinking(false); // 收到第一个 chunk 说明思考结束
+            setReport((prev) => prev + chunk);
+          },
+          onThinking: isReasoningModel ? (thinking) => {
+            setThinkingContent((prev) => prev + thinking);
+          } : undefined,
+        },
+        signal: abortControllerRef.current.signal,
+        modelId: selectedModelId || undefined,
+        thinkingMode: isReasoningModel ? thinkingMode : undefined,
+      });
 
+      setIsThinking(false);
       setModelInfo(result.model);
       abortControllerRef.current = null;
 
@@ -290,6 +320,7 @@ export default function Home() {
     {
       manual: true,
       onError: (err) => {
+        setIsThinking(false);
         // AbortError 不显示错误
         if (err.name === 'AbortError') return;
         toast.error(err.message || '生成失败');
@@ -315,6 +346,9 @@ export default function Home() {
       abortControllerRef.current.abort();
     }
     handleCancel();
+    // 关闭思考区域
+    setIsThinking(false);
+    setThinkingContent('');
   };
 
   return (
@@ -411,6 +445,28 @@ export default function Home() {
             )}
           </div>
 
+          {/* 推理模式开关 - 仅对豆包 Seed 模型显示 */}
+          {isReasoningModel && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setThinkingMode(thinkingMode === 'disabled' ? 'enabled' : 'disabled')}
+                disabled={isGenerating}
+                className={`
+                  flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border
+                  ${thinkingMode !== 'disabled'
+                    ? 'bg-purple-500/20 text-purple-400 border-purple-500/30 hover:bg-purple-500/30'
+                    : 'bg-[#21262d] text-[#8b949e] border-[#30363d] hover:bg-[#30363d]'
+                  }
+                  ${isGenerating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                `}
+                title={thinkingMode !== 'disabled' ? '点击关闭深度推理' : '点击开启深度推理'}
+              >
+                <span className="text-base">{thinkingMode !== 'disabled' ? '🧠' : '⚡'}</span>
+                <span>{thinkingMode !== 'disabled' ? '深度推理' : '快速模式'}</span>
+              </button>
+            </div>
+          )}
+
           {/* 查看 Prompt 按钮 */}
           <button
             onClick={() => setShowPromptPanel(true)}
@@ -425,26 +481,11 @@ export default function Home() {
           {isGenerating ? (
             <button
               onClick={onCancel}
-              className="px-8 py-2.5 rounded-lg font-medium text-sm bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all duration-200"
+              className="px-8 py-2.5 rounded-lg font-medium text-sm bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-all duration-200 border border-red-500/30"
             >
               <span className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                生成中... 点击取消
+                <StopCircle className="h-4 w-4" />
+                终止生成
               </span>
             </button>
           ) : (
@@ -470,6 +511,73 @@ export default function Home() {
             </span>
           )}
         </div>
+
+        {/* 思考过程展示区 - 仅在推理模式下显示 */}
+        {(isThinking || thinkingContent) && isReasoningModel && thinkingMode !== 'disabled' && (
+          <div className="bg-[#161b22] rounded-lg border border-purple-500/30 overflow-hidden">
+            <div 
+              className="flex items-center justify-between px-4 py-2 bg-purple-500/10 border-b border-purple-500/20 cursor-pointer hover:bg-purple-500/15 transition-colors"
+              onClick={() => !isThinking && setIsThinkingExpanded(!isThinkingExpanded)}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-purple-400">🧠</span>
+                <span className="text-sm font-medium text-purple-300">
+                  {isThinking ? '模型思考中...' : '思考过程'}
+                </span>
+                {isThinking && (
+                  <svg className="animate-spin h-4 w-4 text-purple-400" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {!isThinking && thinkingContent && (
+                  <span className="text-xs text-purple-400/60">
+                    {thinkingContent.length} 字符
+                  </span>
+                )}
+                {!isThinking && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsThinkingExpanded(!isThinkingExpanded);
+                    }}
+                    className="text-purple-400/60 hover:text-purple-400 transition-colors"
+                  >
+                    {isThinkingExpanded ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+            {(isThinkingExpanded || isThinking) && (
+              <div 
+                ref={thinkingScrollRef}
+                className="p-4 max-h-32 overflow-y-auto scroll-smooth"
+              >
+                <pre className="text-xs text-purple-200/80 whitespace-pre-wrap font-mono leading-relaxed">
+                  {thinkingContent || '等待模型思考...'}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 下半区：周报输出 */}
         <SyncScrollEditor
