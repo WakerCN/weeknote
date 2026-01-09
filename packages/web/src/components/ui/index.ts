@@ -6,3 +6,5 @@ export { Toggle } from './toggle';
 export { SettingsCard, SettingsCardHeader } from './settings-card';
 export { SettingsFooter } from './settings-footer';
 export { Loading } from './loading';
+export { TimePicker } from './time-picker';
+export { Checkbox } from './checkbox';
