@@ -10,21 +10,29 @@ import {
   generateReminderMessage,
 } from './server-chan.js';
 import { sendDingtalkMessage } from './dingtalk.js';
-import type { ReminderConfig, PushResult } from './types.js';
+import type { ReminderConfig, ScheduleTime } from './types.js';
 
 /**
- * 检查是否有任何渠道已配置
+ * 检查是否有任何渠道已配置且有提醒时间
  */
 function hasAnyChannelConfigured(config: ReminderConfig): boolean {
   const { channels } = config;
 
-  // 钉钉：启用且有 webhook
-  if (channels.dingtalk.enabled && channels.dingtalk.webhook) {
+  // 钉钉：启用且有 webhook 且有提醒时间
+  if (
+    channels.dingtalk.enabled &&
+    channels.dingtalk.webhook &&
+    channels.dingtalk.schedules.times.some((t) => t.enabled)
+  ) {
     return true;
   }
 
-  // Server酱：启用且有 sendKey
-  if (channels.serverChan.enabled && channels.serverChan.sendKey) {
+  // Server酱：启用且有 sendKey 且有提醒时间
+  if (
+    channels.serverChan.enabled &&
+    channels.serverChan.sendKey &&
+    channels.serverChan.schedules.times.some((t) => t.enabled)
+  ) {
     return true;
   }
 
@@ -36,16 +44,28 @@ function hasAnyChannelConfigured(config: ReminderConfig): boolean {
  */
 function getEnabledChannels(config: ReminderConfig): string[] {
   const channels: string[] = [];
-  if (config.channels.dingtalk.enabled && config.channels.dingtalk.webhook) {
+  if (
+    config.channels.dingtalk.enabled &&
+    config.channels.dingtalk.webhook &&
+    config.channels.dingtalk.schedules.times.some((t) => t.enabled)
+  ) {
     channels.push('钉钉');
   }
   if (
     config.channels.serverChan.enabled &&
-    config.channels.serverChan.sendKey
+    config.channels.serverChan.sendKey &&
+    config.channels.serverChan.schedules.times.some((t) => t.enabled)
   ) {
     channels.push('Server酱');
   }
   return channels;
+}
+
+/**
+ * 格式化时间显示
+ */
+function formatTime(hour: number, minute: number): string {
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
 /**
@@ -118,79 +138,83 @@ export class ReminderScheduler {
     const hour = now.getHours();
     const minute = now.getMinutes();
 
-    const { morning, evening } = this.config.schedules;
-
-    // 检查是否匹配提醒时间
-    const isMorningTime =
-      morning.enabled && hour === morning.hour && minute === morning.minute;
-    const isEveningTime =
-      evening.enabled && hour === evening.hour && minute === evening.minute;
-
-    if (!isMorningTime && !isEveningTime) {
-      return;
-    }
-
     // 检查是否为法定工作日
     const workdayInfo = isLegalWorkday(now);
-
     if (!workdayInfo.isWorkday) {
-      console.log(`[Reminder] 今天是${workdayInfo.reason}，跳过提醒`);
+      // 只在整点时输出日志，避免每分钟都输出
+      if (minute === 0) {
+        console.log(`[Reminder] 今天是${workdayInfo.reason}，跳过提醒`);
+      }
       return;
     }
 
-    // 发送提醒
-    const scheduleName = isMorningTime ? '上午提醒' : '晚间提醒';
-    console.log(`[Reminder] 触发${scheduleName}，正在发送...`);
+    const { channels } = this.config;
 
-    await this.sendToAllChannels(scheduleName);
+    // 检查钉钉渠道
+    if (channels.dingtalk.enabled && channels.dingtalk.webhook) {
+      const matchingTimes = channels.dingtalk.schedules.times.filter(
+        (t) => t.enabled && t.hour === hour && t.minute === minute
+      );
+      for (const time of matchingTimes) {
+        await this.sendToDingtalk(time);
+      }
+    }
+
+    // 检查 Server酱渠道
+    if (channels.serverChan.enabled && channels.serverChan.sendKey) {
+      const matchingTimes = channels.serverChan.schedules.times.filter(
+        (t) => t.enabled && t.hour === hour && t.minute === minute
+      );
+      for (const time of matchingTimes) {
+        await this.sendToServerChan(time);
+      }
+    }
   }
 
   /**
-   * 向所有已启用的渠道发送消息
+   * 发送钉钉消息
    */
-  private async sendToAllChannels(scheduleName: string): Promise<void> {
+  private async sendToDingtalk(time: ScheduleTime): Promise<void> {
     if (!this.config) return;
 
+    const scheduleName = time.label || formatTime(time.hour, time.minute);
+    console.log(`[Reminder] 触发钉钉「${scheduleName}」，正在发送...`);
+
     const { title, content } = generateReminderMessage();
-    const results: { channel: string; result: PushResult }[] = [];
+    const result = await sendDingtalkMessage(
+      this.config.channels.dingtalk.webhook,
+      title,
+      content,
+      this.config.channels.dingtalk.secret
+    );
 
-    // 钉钉
-    if (
-      this.config.channels.dingtalk.enabled &&
-      this.config.channels.dingtalk.webhook
-    ) {
-      const result = await sendDingtalkMessage(
-        this.config.channels.dingtalk.webhook,
-        title,
-        content,
-        this.config.channels.dingtalk.secret
-      );
-      results.push({ channel: '钉钉', result });
+    if (result.success) {
+      console.log(`[Reminder] 钉钉「${scheduleName}」推送成功`);
+    } else {
+      console.error(`[Reminder] 钉钉「${scheduleName}」推送失败:`, result.error);
     }
+  }
 
-    // Server酱
-    if (
-      this.config.channels.serverChan.enabled &&
-      this.config.channels.serverChan.sendKey
-    ) {
-      const result = await sendServerChanMessage(
-        this.config.channels.serverChan.sendKey,
-        title,
-        content
-      );
-      results.push({ channel: 'Server酱', result });
-    }
+  /**
+   * 发送 Server酱消息
+   */
+  private async sendToServerChan(time: ScheduleTime): Promise<void> {
+    if (!this.config) return;
 
-    // 输出结果
-    for (const { channel, result } of results) {
-      if (result.success) {
-        console.log(`[Reminder] ${scheduleName} - ${channel} 推送成功`);
-      } else {
-        console.error(
-          `[Reminder] ${scheduleName} - ${channel} 推送失败:`,
-          result.error
-        );
-      }
+    const scheduleName = time.label || formatTime(time.hour, time.minute);
+    console.log(`[Reminder] 触发 Server酱「${scheduleName}」，正在发送...`);
+
+    const { title, content } = generateReminderMessage();
+    const result = await sendServerChanMessage(
+      this.config.channels.serverChan.sendKey,
+      title,
+      content
+    );
+
+    if (result.success) {
+      console.log(`[Reminder] Server酱「${scheduleName}」推送成功`);
+    } else {
+      console.error(`[Reminder] Server酱「${scheduleName}」推送失败:`, result.error);
     }
   }
 
@@ -200,18 +224,31 @@ export class ReminderScheduler {
   private logNextTriggers(): void {
     if (!this.config) return;
 
-    const { morning, evening } = this.config.schedules;
+    const { channels } = this.config;
     const triggers: string[] = [];
 
-    if (morning.enabled) {
-      triggers.push(`上午提醒 ${String(morning.hour).padStart(2, '0')}:${String(morning.minute).padStart(2, '0')}`);
+    // 钉钉提醒时间
+    if (channels.dingtalk.enabled && channels.dingtalk.webhook) {
+      const dingtalkTimes = channels.dingtalk.schedules.times
+        .filter((t) => t.enabled)
+        .map((t) => t.label || formatTime(t.hour, t.minute));
+      if (dingtalkTimes.length > 0) {
+        triggers.push(`钉钉: ${dingtalkTimes.join(', ')}`);
+      }
     }
-    if (evening.enabled) {
-      triggers.push(`晚间提醒 ${String(evening.hour).padStart(2, '0')}:${String(evening.minute).padStart(2, '0')}`);
+
+    // Server酱提醒时间
+    if (channels.serverChan.enabled && channels.serverChan.sendKey) {
+      const serverChanTimes = channels.serverChan.schedules.times
+        .filter((t) => t.enabled)
+        .map((t) => t.label || formatTime(t.hour, t.minute));
+      if (serverChanTimes.length > 0) {
+        triggers.push(`Server酱: ${serverChanTimes.join(', ')}`);
+      }
     }
 
     if (triggers.length > 0) {
-      console.log(`[Reminder] 提醒时间: ${triggers.join(', ')}`);
+      console.log(`[Reminder] 提醒时间: ${triggers.join(' | ')}`);
     }
   }
 

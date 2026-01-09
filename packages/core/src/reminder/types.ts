@@ -3,15 +3,27 @@
  */
 
 /**
- * 提醒时间配置
+ * 单个提醒时间点
  */
-export interface ScheduleConfig {
+export interface ScheduleTime {
+  /** 唯一标识（用于前端 key） */
+  id: string;
   /** 小时（0-23） */
   hour: number;
   /** 分钟（0-59） */
   minute: number;
   /** 是否启用 */
   enabled: boolean;
+  /** 自定义标签（可选，如"上班提醒"、"下班提醒"） */
+  label?: string;
+}
+
+/**
+ * 渠道提醒时间配置
+ */
+export interface ChannelSchedules {
+  /** 提醒时间列表 */
+  times: ScheduleTime[];
 }
 
 /**
@@ -24,6 +36,8 @@ export interface DingtalkConfig {
   webhook: string;
   /** 加签密钥（可选，建议配置） */
   secret?: string;
+  /** 该渠道的提醒时间 */
+  schedules: ChannelSchedules;
 }
 
 /**
@@ -34,6 +48,8 @@ export interface ServerChanConfig {
   enabled: boolean;
   /** SendKey */
   sendKey: string;
+  /** 该渠道的提醒时间 */
+  schedules: ChannelSchedules;
 }
 
 /**
@@ -56,14 +72,6 @@ export interface ReminderConfig {
   /** 推送渠道配置 */
   channels: ChannelsConfig;
 
-  /** 提醒时间 */
-  schedules: {
-    /** 上午提醒 */
-    morning: ScheduleConfig;
-    /** 晚间提醒 */
-    evening: ScheduleConfig;
-  };
-
   /** 更新时间 */
   updatedAt: string;
 
@@ -72,6 +80,47 @@ export interface ReminderConfig {
    * @deprecated 使用 channels.serverChan.sendKey
    */
   sendKey?: string;
+}
+
+/**
+ * 旧版提醒时间配置（用于迁移）
+ * @deprecated 使用各渠道的 schedules
+ */
+export interface LegacyScheduleConfig {
+  /** 小时（0-23） */
+  hour: number;
+  /** 分钟（0-59） */
+  minute: number;
+  /** 是否启用 */
+  enabled: boolean;
+}
+
+/**
+ * 旧版提醒配置（用于迁移）
+ */
+export interface LegacyReminderConfig {
+  enabled?: boolean;
+  sendKey?: string;
+  schedules?: {
+    morning: LegacyScheduleConfig;
+    evening: LegacyScheduleConfig;
+  };
+  channels?: {
+    dingtalk?: Partial<DingtalkConfig>;
+    serverChan?: Partial<ServerChanConfig>;
+  };
+  updatedAt?: string;
+}
+
+/**
+ * 保存提醒配置的参数类型（支持部分更新）
+ */
+export interface SaveReminderConfigParams {
+  enabled?: boolean;
+  channels?: {
+    dingtalk?: Partial<DingtalkConfig>;
+    serverChan?: Partial<ServerChanConfig>;
+  };
 }
 
 /**

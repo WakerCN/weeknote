@@ -5,13 +5,17 @@
 // 类型导出
 export type {
   ReminderConfig,
-  ScheduleConfig,
+  ScheduleTime,
+  ChannelSchedules,
   HolidayData,
   WorkdayInfo,
   PushResult,
   DingtalkConfig,
   ServerChanConfig,
   ChannelsConfig,
+  LegacyScheduleConfig,
+  LegacyReminderConfig,
+  SaveReminderConfigParams,
 } from './types.js';
 
 // 配置管理
@@ -19,8 +23,10 @@ export {
   loadReminderConfig,
   saveReminderConfig,
   getReminderConfigPath,
+  generateId,
   DEFAULT_REMINDER_CONFIG,
   DEFAULT_CHANNELS_CONFIG,
+  DEFAULT_CHANNEL_SCHEDULES,
 } from './config.js';
 
 // 节假日数据
