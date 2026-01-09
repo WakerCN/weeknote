@@ -133,7 +133,7 @@ export interface GenerateStreamResult {
 }
 
 /**
- * 思考模式类型（仅适用于豆包 Seed 推理模型）
+ * 思考模式类型（适用于推理模型：豆包 Seed、DeepSeek R1）
  */
 export type ThinkingMode = 'enabled' | 'disabled' | 'auto';
 
@@ -155,7 +155,7 @@ export interface GenerateStreamOptions {
   callbacks: StreamCallbacks;
   signal?: AbortSignal;
   modelId?: string;
-  /** 思考模式（仅豆包 Seed 推理模型支持） */
+  /** 思考模式（推理模型支持：豆包 Seed、DeepSeek R1） */
   thinkingMode?: ThinkingMode;
 }
 
@@ -433,10 +433,29 @@ export interface ScheduleConfig {
   enabled: boolean;
 }
 
+// 钉钉机器人配置
+export interface DingtalkConfig {
+  enabled: boolean;
+  webhook: string;
+  secret?: string;
+}
+
+// Server酱配置
+export interface ServerChanConfig {
+  enabled: boolean;
+  sendKey: string;
+}
+
+// 推送渠道配置
+export interface ChannelsConfig {
+  dingtalk: DingtalkConfig;
+  serverChan: ServerChanConfig;
+}
+
 // 提醒配置
 export interface ReminderConfig {
   enabled: boolean;
-  sendKey: string;
+  channels: ChannelsConfig;
   schedules: {
     morning: ScheduleConfig;
     evening: ScheduleConfig;
@@ -453,12 +472,14 @@ export interface ReminderConfig {
     workdaysCount: number;
   } | null;
   availableYears: number[];
+  /** @deprecated 使用 channels.serverChan.sendKey */
+  sendKey?: string;
 }
 
 // 保存提醒配置参数
 export interface SaveReminderParams {
   enabled?: boolean;
-  sendKey?: string;
+  channels?: Partial<ChannelsConfig>;
   schedules?: {
     morning?: Partial<ScheduleConfig>;
     evening?: Partial<ScheduleConfig>;
@@ -477,7 +498,20 @@ export const saveReminder = (params: SaveReminderParams) =>
   api.put<unknown, { success: boolean; config: ReminderConfig }>('/reminder', params);
 
 /**
- * 测试推送
+ * 测试 Server酱 推送
+ */
+export const testServerChan = (sendKey: string) =>
+  api.post<unknown, { success: boolean; error?: string }>('/reminder/test/server-chan', { sendKey });
+
+/**
+ * 测试钉钉机器人推送
+ */
+export const testDingtalk = (webhook: string, secret?: string) =>
+  api.post<unknown, { success: boolean; error?: string }>('/reminder/test/dingtalk', { webhook, secret });
+
+/**
+ * 测试推送（兼容旧接口）
+ * @deprecated 使用 testServerChan 或 testDingtalk
  */
 export const testReminder = (sendKey: string) =>
   api.post<unknown, { success: boolean; error?: string }>('/reminder/test', { sendKey });

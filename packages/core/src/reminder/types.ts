@@ -15,14 +15,46 @@ export interface ScheduleConfig {
 }
 
 /**
+ * 钉钉机器人配置
+ */
+export interface DingtalkConfig {
+  /** 是否启用 */
+  enabled: boolean;
+  /** Webhook 地址（含 access_token） */
+  webhook: string;
+  /** 加签密钥（可选，建议配置） */
+  secret?: string;
+}
+
+/**
+ * Server酱配置
+ */
+export interface ServerChanConfig {
+  /** 是否启用 */
+  enabled: boolean;
+  /** SendKey */
+  sendKey: string;
+}
+
+/**
+ * 推送渠道配置
+ */
+export interface ChannelsConfig {
+  /** 钉钉机器人 */
+  dingtalk: DingtalkConfig;
+  /** Server酱（微信推送） */
+  serverChan: ServerChanConfig;
+}
+
+/**
  * 提醒配置
  */
 export interface ReminderConfig {
   /** 是否启用提醒 */
   enabled: boolean;
 
-  /** Server酱 SendKey */
-  sendKey: string;
+  /** 推送渠道配置 */
+  channels: ChannelsConfig;
 
   /** 提醒时间 */
   schedules: {
@@ -34,6 +66,12 @@ export interface ReminderConfig {
 
   /** 更新时间 */
   updatedAt: string;
+
+  /**
+   * Server酱 SendKey
+   * @deprecated 使用 channels.serverChan.sendKey
+   */
+  sendKey?: string;
 }
 
 /**

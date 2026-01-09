@@ -7,9 +7,11 @@ import {
   loadReminderConfig,
   saveReminderConfig,
   sendTestMessage,
+  sendDingtalkTestMessage,
   reminderScheduler,
   loadHolidayData,
   getAvailableYears,
+  type ChannelsConfig,
 } from '@weeknote/core';
 
 const router: Router = Router();
@@ -58,18 +60,28 @@ router.get('/', (_req, res) => {
  */
 router.put('/', (req, res) => {
   try {
-    const { enabled, sendKey: rawSendKey, schedules } = req.body;
+    const { enabled, channels, schedules } = req.body;
 
-    // 对 SendKey 进行 trim 处理，避免空白字符导致的问题
-    const sendKey =
-      typeof rawSendKey === 'string' ? rawSendKey.trim() : rawSendKey;
+    // 验证渠道配置
+    if (channels) {
+      // 验证 Server酱 SendKey 格式
+      if (channels.serverChan?.sendKey) {
+        const sendKey = channels.serverChan.sendKey.trim();
+        if (sendKey.length > 0 && !sendKey.startsWith('SCT')) {
+          return res.status(400).json({
+            error: '无效的 SendKey，Server酱的 SendKey 应以 SCT 开头',
+          });
+        }
+      }
 
-    // 验证 SendKey 格式（Server酱的 SendKey 以 SCT 开头）
-    if (sendKey && typeof sendKey === 'string' && sendKey.length > 0) {
-      if (!sendKey.startsWith('SCT')) {
-        return res.status(400).json({
-          error: '无效的 SendKey，Server酱的 SendKey 应以 SCT 开头',
-        });
+      // 验证钉钉 Webhook 格式
+      if (channels.dingtalk?.webhook) {
+        const webhook = channels.dingtalk.webhook.trim();
+        if (webhook.length > 0 && !webhook.startsWith('https://oapi.dingtalk.com/robot/send')) {
+          return res.status(400).json({
+            error: '无效的 Webhook，钉钉机器人 Webhook 应以 https://oapi.dingtalk.com/robot/send 开头',
+          });
+        }
       }
     }
 
@@ -93,10 +105,29 @@ router.put('/', (req, res) => {
       }
     }
 
+    // 处理渠道配置，进行 trim
+    const processedChannels: Partial<ChannelsConfig> | undefined = channels
+      ? {
+          dingtalk: channels.dingtalk
+            ? {
+                enabled: channels.dingtalk.enabled ?? false,
+                webhook: channels.dingtalk.webhook?.trim() ?? '',
+                secret: channels.dingtalk.secret?.trim() ?? '',
+              }
+            : undefined,
+          serverChan: channels.serverChan
+            ? {
+                enabled: channels.serverChan.enabled ?? false,
+                sendKey: channels.serverChan.sendKey?.trim() ?? '',
+              }
+            : undefined,
+        }
+      : undefined;
+
     // 保存配置
     const newConfig = saveReminderConfig({
       enabled,
-      sendKey,
+      channels: processedChannels as ChannelsConfig,
       schedules,
     });
 
@@ -118,8 +149,94 @@ router.put('/', (req, res) => {
 });
 
 /**
- * 测试推送
+ * 测试 Server酱 推送
+ * POST /api/reminder/test/server-chan
+ */
+router.post('/test/server-chan', async (req, res) => {
+  try {
+    const { sendKey } = req.body;
+
+    if (!sendKey) {
+      return res.status(400).json({ error: 'SendKey 不能为空' });
+    }
+
+    const trimmedKey = sendKey.trim();
+    if (!trimmedKey.startsWith('SCT')) {
+      return res.status(400).json({
+        error: '无效的 SendKey，Server酱的 SendKey 应以 SCT 开头',
+      });
+    }
+
+    console.log('[API] 发送 Server酱 测试消息...');
+
+    const result = await sendTestMessage(trimmedKey);
+
+    if (result.success) {
+      console.log('[API] Server酱 测试消息发送成功');
+      res.json({ success: true });
+    } else {
+      console.error('[API] Server酱 测试消息发送失败:', result.error);
+      res.status(400).json({
+        success: false,
+        error: result.error,
+      });
+    }
+  } catch (error) {
+    console.error('[API] Server酱 测试推送失败:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : '测试失败',
+    });
+  }
+});
+
+/**
+ * 测试钉钉机器人推送
+ * POST /api/reminder/test/dingtalk
+ */
+router.post('/test/dingtalk', async (req, res) => {
+  try {
+    const { webhook, secret } = req.body;
+
+    if (!webhook) {
+      return res.status(400).json({ error: 'Webhook 不能为空' });
+    }
+
+    const trimmedWebhook = webhook.trim();
+    if (!trimmedWebhook.startsWith('https://oapi.dingtalk.com/robot/send')) {
+      return res.status(400).json({
+        error: '无效的 Webhook，钉钉机器人 Webhook 应以 https://oapi.dingtalk.com/robot/send 开头',
+      });
+    }
+
+    console.log('[API] 发送钉钉测试消息...');
+
+    const result = await sendDingtalkTestMessage(
+      trimmedWebhook,
+      secret?.trim() || undefined
+    );
+
+    if (result.success) {
+      console.log('[API] 钉钉测试消息发送成功');
+      res.json({ success: true });
+    } else {
+      console.error('[API] 钉钉测试消息发送失败:', result.error);
+      res.status(400).json({
+        success: false,
+        error: result.error,
+      });
+    }
+  } catch (error) {
+    console.error('[API] 钉钉测试推送失败:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : '测试失败',
+    });
+  }
+});
+
+/**
+ * 兼容旧的测试接口
  * POST /api/reminder/test
+ * @deprecated 使用 /test/server-chan 或 /test/dingtalk
  */
 router.post('/test', async (req, res) => {
   try {
@@ -129,7 +246,8 @@ router.post('/test', async (req, res) => {
       return res.status(400).json({ error: 'SendKey 不能为空' });
     }
 
-    if (!sendKey.startsWith('SCT')) {
+    const trimmedKey = sendKey.trim();
+    if (!trimmedKey.startsWith('SCT')) {
       return res.status(400).json({
         error: '无效的 SendKey，Server酱的 SendKey 应以 SCT 开头',
       });
@@ -137,7 +255,7 @@ router.post('/test', async (req, res) => {
 
     console.log('[API] 发送测试消息...');
 
-    const result = await sendTestMessage(sendKey);
+    const result = await sendTestMessage(trimmedKey);
 
     if (result.success) {
       console.log('[API] 测试消息发送成功');
