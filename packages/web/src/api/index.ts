@@ -426,11 +426,18 @@ export const deleteWeek = (fileName: string) =>
 
 // ========== 提醒功能 API ==========
 
-// 提醒时间配置
-export interface ScheduleConfig {
+// 单个提醒时间点
+export interface ScheduleTime {
+  id: string;
   hour: number;
   minute: number;
   enabled: boolean;
+  label?: string;
+}
+
+// 渠道提醒时间配置
+export interface ChannelSchedules {
+  times: ScheduleTime[];
 }
 
 // 钉钉机器人配置
@@ -438,12 +445,14 @@ export interface DingtalkConfig {
   enabled: boolean;
   webhook: string;
   secret?: string;
+  schedules: ChannelSchedules;
 }
 
 // Server酱配置
 export interface ServerChanConfig {
   enabled: boolean;
   sendKey: string;
+  schedules: ChannelSchedules;
 }
 
 // 推送渠道配置
@@ -456,10 +465,6 @@ export interface ChannelsConfig {
 export interface ReminderConfig {
   enabled: boolean;
   channels: ChannelsConfig;
-  schedules: {
-    morning: ScheduleConfig;
-    evening: ScheduleConfig;
-  };
   updatedAt: string;
   scheduler: {
     running: boolean;
@@ -479,10 +484,9 @@ export interface ReminderConfig {
 // 保存提醒配置参数
 export interface SaveReminderParams {
   enabled?: boolean;
-  channels?: Partial<ChannelsConfig>;
-  schedules?: {
-    morning?: Partial<ScheduleConfig>;
-    evening?: Partial<ScheduleConfig>;
+  channels?: {
+    dingtalk?: Partial<DingtalkConfig>;
+    serverChan?: Partial<ServerChanConfig>;
   };
 }
 

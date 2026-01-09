@@ -5,6 +5,7 @@
 import { useState, useMemo, useRef } from 'react';
 import { useRequest } from 'ahooks';
 import { toast } from 'sonner';
+import { Plus, Trash2 } from 'lucide-react';
 import {
   getReminder,
   saveReminder,
@@ -12,60 +13,179 @@ import {
   testDingtalk,
   type ReminderConfig,
   type SaveReminderParams,
-  type ChannelsConfig,
+  type ScheduleTime,
+  type ChannelSchedules,
 } from '../../api';
-import { Toggle, SettingsCard, SettingsCardHeader, SettingsFooter, Loading } from '../../components/ui';
+import { Toggle, SettingsCard, SettingsCardHeader, SettingsFooter, Loading, TimePicker, Checkbox } from '../../components/ui';
 import { hasFormChanges } from '../../lib/form-utils';
+import DingtalkLogo from '../../assets/logos/ding.png';
+import WechatLogo from '../../assets/logos/wechat.png';
 
-// 时间选择器组件
-function TimeSelector({
-  label,
-  hour,
-  minute,
-  enabled,
+/**
+ * 生成唯一 ID
+ */
+function generateId(): string {
+  return Math.random().toString(36).substring(2, 10);
+}
+
+/**
+ * 单个时间点编辑器
+ */
+/**
+ * 单个时间标签（带删除按钮）
+ */
+function TimeTag({
+  time,
   onChange,
+  onRemove,
+  canRemove,
 }: {
-  label: string;
-  hour: number;
-  minute: number;
-  enabled: boolean;
-  onChange: (data: { hour?: number; minute?: number; enabled?: boolean }) => void;
+  time: ScheduleTime;
+  onChange: (updates: Partial<ScheduleTime>) => void;
+  onRemove: () => void;
+  canRemove: boolean;
 }) {
   return (
-    <div className="flex items-center gap-4 p-3 bg-[#0d1117] rounded-lg border border-[#30363d]">
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => onChange({ enabled: e.target.checked })}
-          className="w-4 h-4 rounded border-[#30363d] bg-[#161b22] text-emerald-500 focus:ring-emerald-500/20"
+    <div className="relative group">
+      {/* 删除按钮 - 右上角 */}
+      {canRemove && (
+        <button
+          onClick={onRemove}
+          className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#21262d] border border-[#30363d] text-[#8b949e] hover:text-red-400 hover:border-red-400/50 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center"
+          title="删除"
+        >
+          <Trash2 className="w-2.5 h-2.5" />
+        </button>
+      )}
+      
+      <div className="flex items-center gap-2 px-2 py-1.5 bg-[#0d1117] rounded-lg border border-[#30363d]">
+        {/* 启用开关 */}
+        <Checkbox
+          checked={time.enabled}
+          onChange={(checked) => onChange({ enabled: checked })}
+          size="sm"
         />
-        <span className={`text-sm ${enabled ? 'text-[#f0f6fc]' : 'text-[#484f58]'}`}>
-          {label}
-        </span>
-      </label>
-      <div className="flex items-center gap-1 ml-auto">
-        <select
-          value={hour}
-          onChange={(e) => onChange({ hour: parseInt(e.target.value, 10) })}
-          disabled={!enabled}
-          className="px-2 py-1 bg-[#161b22] border border-[#30363d] rounded text-sm text-[#f0f6fc] disabled:opacity-50 disabled:cursor-not-allowed"
+        
+        {/* 时间选择 */}
+        <TimePicker
+          hour={time.hour}
+          minute={time.minute}
+          onChange={(hour, minute) => onChange({ hour, minute })}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 检查时间是否重复
+ */
+function isDuplicateTime(times: ScheduleTime[], hour: number, minute: number, excludeId?: string): boolean {
+  return times.some((t) => t.id !== excludeId && t.hour === hour && t.minute === minute);
+}
+
+/**
+ * 查找一个不重复的时间
+ */
+function findAvailableTime(times: ScheduleTime[]): { hour: number; minute: number } {
+  // 常用时间列表
+  const preferredTimes = [
+    { hour: 9, minute: 0 },
+    { hour: 10, minute: 0 },
+    { hour: 14, minute: 0 },
+    { hour: 17, minute: 0 },
+    { hour: 18, minute: 0 },
+    { hour: 20, minute: 0 },
+  ];
+  
+  // 优先使用常用时间
+  for (const t of preferredTimes) {
+    if (!isDuplicateTime(times, t.hour, t.minute)) {
+      return t;
+    }
+  }
+  
+  // 遍历所有时间找一个可用的
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m++) {
+      if (!isDuplicateTime(times, h, m)) {
+        return { hour: h, minute: m };
+      }
+    }
+  }
+  
+  // 理论上不会走到这里（24*60=1440个时间点）
+  return { hour: 0, minute: 0 };
+}
+
+/**
+ * 时间列表编辑器（横向布局）
+ */
+function TimeListEditor({
+  schedules,
+  onChange,
+}: {
+  schedules: ChannelSchedules;
+  onChange: (schedules: ChannelSchedules) => void;
+}) {
+  const addTime = () => {
+    const newTime = findAvailableTime(schedules.times);
+    onChange({
+      times: [
+        ...schedules.times,
+        { id: generateId(), hour: newTime.hour, minute: newTime.minute, enabled: true },
+      ],
+    });
+  };
+
+  const removeTime = (id: string) => {
+    if (schedules.times.length <= 1) return;
+    onChange({
+      times: schedules.times.filter((t) => t.id !== id),
+    });
+  };
+
+  const updateTime = (id: string, updates: Partial<ScheduleTime>) => {
+    // 检查时间是否重复
+    const currentTime = schedules.times.find((t) => t.id === id);
+    if (currentTime && (updates.hour !== undefined || updates.minute !== undefined)) {
+      const newHour = updates.hour ?? currentTime.hour;
+      const newMinute = updates.minute ?? currentTime.minute;
+      
+      if (isDuplicateTime(schedules.times, newHour, newMinute, id)) {
+        toast.error('该时间已存在');
+        return;
+      }
+    }
+    
+    onChange({
+      times: schedules.times.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+    });
+  };
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-sm text-[#8b949e]">📅 提醒时间</span>
+      </div>
+      <div className="flex items-center flex-wrap gap-2">
+        {schedules.times.map((time) => (
+          <TimeTag
+            key={time.id}
+            time={time}
+            onChange={(updates) => updateTime(time.id, updates)}
+            onRemove={() => removeTime(time.id)}
+            canRemove={schedules.times.length > 1}
+          />
+        ))}
+        {/* 添加按钮 */}
+        <button
+          onClick={addTime}
+          className="flex items-center justify-center w-8 h-8 rounded-lg border border-dashed border-[#30363d] text-[#8b949e] hover:text-[#58a6ff] hover:border-[#58a6ff] transition-colors"
+          title="添加提醒时间"
         >
-          {Array.from({ length: 24 }, (_, i) => (
-            <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-          ))}
-        </select>
-        <span className="text-[#8b949e]">:</span>
-        <select
-          value={minute}
-          onChange={(e) => onChange({ minute: parseInt(e.target.value, 10) })}
-          disabled={!enabled}
-          className="px-2 py-1 bg-[#161b22] border border-[#30363d] rounded text-sm text-[#f0f6fc] disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {Array.from({ length: 60 }, (_, i) => (
-            <option key={i} value={i}>{String(i).padStart(2, '0')}</option>
-          ))}
-        </select>
+          <Plus className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );
@@ -79,7 +199,7 @@ function ChannelCard({
   onToggle,
   children,
 }: {
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
@@ -89,7 +209,7 @@ function ChannelCard({
     <div className="p-4 bg-[#0d1117] rounded-lg border border-[#30363d]">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{icon}</span>
+          {icon}
           <span className="font-medium text-[#f0f6fc]">{title}</span>
         </div>
         <Toggle enabled={enabled} onChange={onToggle} size="sm" />
@@ -99,20 +219,16 @@ function ChannelCard({
   );
 }
 
-// 表单快照类型
+// 表单快照类型（用于变更检测）
 interface FormSnapshot {
   enabled: boolean;
   dingtalkEnabled: boolean;
   dingtalkWebhook: string;
   dingtalkSecret: string;
+  dingtalkSchedules: string; // JSON 字符串便于比较
   serverChanEnabled: boolean;
   serverChanSendKey: string;
-  morningEnabled: boolean;
-  morningHour: number;
-  morningMinute: number;
-  eveningEnabled: boolean;
-  eveningHour: number;
-  eveningMinute: number;
+  serverChanSchedules: string; // JSON 字符串便于比较
 }
 
 export default function ReminderSettings() {
@@ -141,14 +257,10 @@ export default function ReminderSettings() {
         dingtalkEnabled: data.channels?.dingtalk?.enabled || false,
         dingtalkWebhook: webhook,
         dingtalkSecret: secret,
+        dingtalkSchedules: JSON.stringify(data.channels?.dingtalk?.schedules?.times || []),
         serverChanEnabled: data.channels?.serverChan?.enabled || false,
         serverChanSendKey: sendKey,
-        morningEnabled: data.schedules.morning.enabled,
-        morningHour: data.schedules.morning.hour,
-        morningMinute: data.schedules.morning.minute,
-        eveningEnabled: data.schedules.evening.enabled,
-        eveningHour: data.schedules.evening.hour,
-        eveningMinute: data.schedules.evening.minute,
+        serverChanSchedules: JSON.stringify(data.channels?.serverChan?.schedules?.times || []),
       };
     },
     onError: (err) => toast.error(err.message || '加载配置失败'),
@@ -162,33 +274,23 @@ export default function ReminderSettings() {
       dingtalkEnabled: config.channels.dingtalk.enabled,
       dingtalkWebhook,
       dingtalkSecret,
+      dingtalkSchedules: JSON.stringify(config.channels.dingtalk.schedules?.times || []),
       serverChanEnabled: config.channels.serverChan.enabled,
       serverChanSendKey,
-      morningEnabled: config.schedules.morning.enabled,
-      morningHour: config.schedules.morning.hour,
-      morningMinute: config.schedules.morning.minute,
-      eveningEnabled: config.schedules.evening.enabled,
-      eveningHour: config.schedules.evening.hour,
-      eveningMinute: config.schedules.evening.minute,
+      serverChanSchedules: JSON.stringify(config.channels.serverChan.schedules?.times || []),
     };
     return hasFormChanges(current, originalSnapshot.current);
   }, [config, dingtalkWebhook, dingtalkSecret, serverChanSendKey]);
 
-  // 更新渠道配置
-  const updateChannel = (channel: keyof ChannelsConfig, updates: Partial<ChannelsConfig[keyof ChannelsConfig]>) => {
+  // 更新渠道提醒时间
+  const updateChannelSchedules = (channel: 'dingtalk' | 'serverChan', schedules: ChannelSchedules) => {
     if (!config) return;
     setConfig({
       ...config,
-      channels: { ...config.channels, [channel]: { ...config.channels[channel], ...updates } },
-    });
-  };
-
-  // 更新提醒时间
-  const updateSchedule = (type: 'morning' | 'evening', updates: { hour?: number; minute?: number; enabled?: boolean }) => {
-    if (!config) return;
-    setConfig({
-      ...config,
-      schedules: { ...config.schedules, [type]: { ...config.schedules[type], ...updates } },
+      channels: {
+        ...config.channels,
+        [channel]: { ...config.channels[channel], schedules },
+      },
     });
   };
 
@@ -197,18 +299,26 @@ export default function ReminderSettings() {
     if (!originalSnapshot.current) return;
     const o = originalSnapshot.current;
     
-    setConfig((prev) => prev && ({
-      ...prev,
-      enabled: o.enabled,
-      channels: {
-        dingtalk: { enabled: o.dingtalkEnabled, webhook: o.dingtalkWebhook, secret: o.dingtalkSecret },
-        serverChan: { enabled: o.serverChanEnabled, sendKey: o.serverChanSendKey },
-      },
-      schedules: {
-        morning: { enabled: o.morningEnabled, hour: o.morningHour, minute: o.morningMinute },
-        evening: { enabled: o.eveningEnabled, hour: o.eveningHour, minute: o.eveningMinute },
-      },
-    }));
+    setConfig((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        enabled: o.enabled,
+        channels: {
+          dingtalk: {
+            enabled: o.dingtalkEnabled,
+            webhook: o.dingtalkWebhook,
+            secret: o.dingtalkSecret,
+            schedules: { times: JSON.parse(o.dingtalkSchedules) },
+          },
+          serverChan: {
+            enabled: o.serverChanEnabled,
+            sendKey: o.serverChanSendKey,
+            schedules: { times: JSON.parse(o.serverChanSchedules) },
+          },
+        },
+      };
+    });
     
     setDingtalkWebhook(o.dingtalkWebhook);
     setDingtalkSecret(o.dingtalkSecret);
@@ -224,10 +334,18 @@ export default function ReminderSettings() {
       const params: SaveReminderParams = {
         enabled: config.enabled,
         channels: {
-          dingtalk: { enabled: config.channels.dingtalk.enabled, webhook: dingtalkWebhook.trim(), secret: dingtalkSecret.trim() },
-          serverChan: { enabled: config.channels.serverChan.enabled, sendKey: serverChanSendKey.trim() },
+          dingtalk: {
+            enabled: config.channels.dingtalk.enabled,
+            webhook: dingtalkWebhook.trim(),
+            secret: dingtalkSecret.trim(),
+            schedules: config.channels.dingtalk.schedules,
+          },
+          serverChan: {
+            enabled: config.channels.serverChan.enabled,
+            sendKey: serverChanSendKey.trim(),
+            schedules: config.channels.serverChan.schedules,
+          },
         },
-        schedules: config.schedules,
       };
       await saveReminder(params);
       toast.success('配置保存成功');
@@ -283,14 +401,23 @@ export default function ReminderSettings() {
 
           {/* 推送渠道 */}
           <SettingsCard>
-            <SettingsCardHeader title="推送渠道" />
+            <SettingsCardHeader title="推送渠道" description="每个渠道可独立配置提醒时间" />
             <div className="space-y-4">
               {/* 钉钉 */}
               <ChannelCard
-                icon="🤖"
+                icon={
+                  <div className="w-5 h-5 overflow-hidden flex-shrink-0">
+                    <img 
+                      src={DingtalkLogo} 
+                      alt="钉钉" 
+                      className="h-5"
+                      style={{ width: '80px', maxWidth: 'none' }}
+                    />
+                  </div>
+                }
                 title="钉钉机器人"
                 enabled={config.channels.dingtalk.enabled}
-                onToggle={(enabled) => updateChannel('dingtalk', { enabled })}
+                onToggle={(enabled) => setConfig({ ...config, channels: { ...config.channels, dingtalk: { ...config.channels.dingtalk, enabled } } })}
               >
                 <div className="space-y-3">
                   <div>
@@ -315,6 +442,13 @@ export default function ReminderSettings() {
                       className="w-full px-3 py-2 bg-[#161b22] border border-[#30363d] rounded-lg text-[#f0f6fc] placeholder-[#484f58] focus:outline-none focus:border-[#58a6ff] text-sm"
                     />
                   </div>
+                  
+                  {/* 钉钉提醒时间 */}
+                  <TimeListEditor
+                    schedules={config.channels.dingtalk.schedules}
+                    onChange={(schedules) => updateChannelSchedules('dingtalk', schedules)}
+                  />
+                  
                   <div className="flex items-center justify-between pt-1">
                     <p className="text-xs text-[#484f58]">💡 在钉钉群设置中添加自定义机器人获取 Webhook</p>
                     <button
@@ -334,10 +468,19 @@ export default function ReminderSettings() {
 
               {/* Server酱 */}
               <ChannelCard
-                icon="📱"
+                icon={
+                  <img 
+                    src={WechatLogo} 
+                    alt="微信" 
+                    className="w-5 h-5"
+                    style={{ 
+                      filter: 'brightness(0) saturate(100%) invert(48%) sepia(79%) saturate(2476%) hue-rotate(118deg) brightness(95%) contrast(101%)'
+                    }}
+                  />
+                }
                 title="Server酱（微信推送）"
                 enabled={config.channels.serverChan.enabled}
-                onToggle={(enabled) => updateChannel('serverChan', { enabled })}
+                onToggle={(enabled) => setConfig({ ...config, channels: { ...config.channels, serverChan: { ...config.channels.serverChan, enabled } } })}
               >
                 <div className="space-y-3">
                   <div>
@@ -350,6 +493,13 @@ export default function ReminderSettings() {
                       className="w-full px-3 py-2 bg-[#161b22] border border-[#30363d] rounded-lg text-[#f0f6fc] placeholder-[#484f58] focus:outline-none focus:border-[#58a6ff] text-sm"
                     />
                   </div>
+                  
+                  {/* Server酱提醒时间 */}
+                  <TimeListEditor
+                    schedules={config.channels.serverChan.schedules}
+                    onChange={(schedules) => updateChannelSchedules('serverChan', schedules)}
+                  />
+                  
                   <div className="flex items-center justify-between pt-1">
                     <p className="text-xs text-[#484f58]">
                       💡 访问 <a href="https://sct.ftqq.com/" target="_blank" rel="noopener noreferrer" className="text-[#58a6ff] hover:underline">sct.ftqq.com</a> 用 GitHub 登录获取，每天免费 5 条
@@ -368,27 +518,6 @@ export default function ReminderSettings() {
                   </div>
                 </div>
               </ChannelCard>
-            </div>
-          </SettingsCard>
-
-          {/* 提醒时间 */}
-          <SettingsCard>
-            <SettingsCardHeader title="提醒时间" description="设置每天的提醒时间" />
-            <div className="space-y-3">
-              <TimeSelector
-                label="上午提醒"
-                hour={config.schedules.morning.hour}
-                minute={config.schedules.morning.minute}
-                enabled={config.schedules.morning.enabled}
-                onChange={(updates) => updateSchedule('morning', updates)}
-              />
-              <TimeSelector
-                label="晚间提醒"
-                hour={config.schedules.evening.hour}
-                minute={config.schedules.evening.minute}
-                enabled={config.schedules.evening.enabled}
-                onChange={(updates) => updateSchedule('evening', updates)}
-              />
             </div>
           </SettingsCard>
 
