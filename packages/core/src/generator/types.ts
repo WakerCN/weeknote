@@ -7,9 +7,9 @@
  * 格式: 平台/模型简称
  */
 export type ModelId =
-  // 豆包（火山方舟）- Seed 系列最新模型
-  | 'doubao/seed-1.8'
-  | 'doubao/seed-1.6'
+  // 豆包（火山方舟）
+  | 'doubao/seed-1.8' // 推理模型
+  | 'doubao/seed-1.6' // 推理模型
   // DeepSeek 官方
   | 'deepseek/deepseek-chat'
   // OpenAI
@@ -42,22 +42,22 @@ export interface ModelMeta {
  * 所有支持的模型配置
  */
 export const MODEL_REGISTRY: Record<ModelId, ModelMeta> = {
-  // 豆包（火山方舟）- Seed 系列最新模型
+  // 豆包（火山方舟）- Seed 推理模型（需要思考时间）
   'doubao/seed-1.8': {
     id: 'doubao/seed-1.8',
-    name: '豆包 Seed 1.8',
+    name: '豆包 Seed 1.8 (推理)',
     apiModel: 'doubao-seed-1.8',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     isFree: false,
-    description: '豆包最新旗舰模型，多模态 Agent 能力增强',
+    description: '推理模型，深度思考后输出，延迟较高',
   },
   'doubao/seed-1.6': {
     id: 'doubao/seed-1.6',
-    name: '豆包 Seed 1.6',
+    name: '豆包 Seed 1.6 (推理)',
     apiModel: 'doubao-seed-1.6',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
     isFree: false,
-    description: '支持分档思考长度，平衡效果与成本',
+    description: '推理模型，支持分档思考长度',
   },
   // DeepSeek 官方
   'deepseek/deepseek-chat': {
@@ -146,6 +146,28 @@ export function isValidModelId(modelId: string): modelId is ModelId {
 }
 
 /**
+ * 思考模式类型（仅适用于豆包 Seed 推理模型）
+ */
+export type ThinkingMode = 'enabled' | 'disabled' | 'auto';
+
+/**
+ * 检查模型是否支持推理模式
+ */
+export function isReasoningModel(modelId: ModelId): boolean {
+  return modelId.startsWith('doubao/seed-');
+}
+
+/**
+ * 流式生成回调选项
+ */
+export interface StreamCallbacks {
+  /** 内容块回调 */
+  onChunk: (chunk: string) => void;
+  /** 思考过程回调（仅推理模型支持） */
+  onThinking?: (thinking: string) => void;
+}
+
+/**
  * 模型配置
  */
 export interface ModelConfig {
@@ -159,6 +181,8 @@ export interface ModelConfig {
   temperature?: number;
   /** 接入点 ID（火山方舟/豆包必需，格式如 ep-xxxxx） */
   endpointId?: string;
+  /** 思考模式（仅豆包 Seed 推理模型支持，默认 auto） */
+  thinkingMode?: ThinkingMode;
 }
 
 /**
@@ -214,11 +238,11 @@ export interface LLMProvider {
   modelId: ModelId;
   /** 生成回复 */
   generate(messages: ChatMessage[], config: ModelConfig): Promise<string>;
-  /** 流式生成回复 */
+  /** 流式生成回复（支持思考过程回调） */
   generateStream(
     messages: ChatMessage[],
     config: ModelConfig,
-    onChunk: (chunk: string) => void
+    callbacks: StreamCallbacks | ((chunk: string) => void)
   ): Promise<string>;
 }
 

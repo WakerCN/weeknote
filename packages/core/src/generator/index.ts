@@ -12,6 +12,8 @@ export type {
   GeneratorErrorType,
   ChatMessage,
   LLMProvider,
+  ThinkingMode,
+  StreamCallbacks,
 } from './types.js';
 
 export {
@@ -22,6 +24,7 @@ export {
   getPaidModels,
   getModelMeta,
   isValidModelId,
+  isReasoningModel,
   // 兼容旧版
   PROVIDER_DEFAULTS,
 } from './types.js';

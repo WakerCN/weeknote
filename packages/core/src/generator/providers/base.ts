@@ -7,8 +7,8 @@ import OpenAI from 'openai';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import type { RequestInit } from 'node-fetch';
 import nodeFetch from 'node-fetch';
-import type { ChatMessage, LLMProvider, ModelConfig, ModelId } from '../types.js';
-import { GeneratorError, MODEL_REGISTRY } from '../types.js';
+import type { ChatMessage, LLMProvider, ModelConfig, ModelId, StreamCallbacks } from '../types.js';
+import { GeneratorError, MODEL_REGISTRY, isReasoningModel } from '../types.js';
 
 /**
  * 获取代理 URL
@@ -208,29 +208,58 @@ export class OpenAICompatibleProvider implements LLMProvider {
   }
 
   /**
-   * 流式生成回复
+   * 流式生成回复（支持思考过程回调）
    */
   async generateStream(
     messages: ChatMessage[],
     config: ModelConfig,
-    onChunk: (chunk: string) => void
+    callbacks: StreamCallbacks | ((chunk: string) => void)
   ): Promise<string> {
     const client = this.createClient(config);
     const meta = this.getModelMeta();
     const actualModel = this.getActualModel(config);
 
+    // 兼容旧的函数回调方式
+    const { onChunk, onThinking } = typeof callbacks === 'function' 
+      ? { onChunk: callbacks, onThinking: undefined }
+      : callbacks;
+
     try {
+      // 构建额外的请求参数（豆包 Seed 推理模型支持 thinking 参数）
+      // 注意：豆包只支持 enabled 和 disabled，不支持 auto
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const extraParams: Record<string, any> = {};
+      if (isReasoningModel(this.modelId) && config.thinkingMode && config.thinkingMode !== 'auto') {
+        extraParams.thinking = {
+          type: config.thinkingMode,
+        };
+      }
+
       const stream = await client.chat.completions.create({
         model: actualModel,
         messages,
         temperature: config.temperature ?? 0.3,
         stream: true,
+        ...extraParams,
       });
 
       let fullContent = '';
+      let fullThinking = '';
 
       for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || '';
+        const delta = chunk.choices[0]?.delta;
+        if (!delta) continue;
+
+        // 处理思考内容（豆包 Seed 模型特有）
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const reasoningContent = (delta as any).reasoning_content;
+        if (reasoningContent && onThinking) {
+          fullThinking += reasoningContent;
+          onThinking(reasoningContent);
+        }
+
+        // 处理正常回复内容
+        const content = delta.content || '';
         if (content) {
           fullContent += content;
           onChunk(content);

@@ -3,7 +3,7 @@
  */
 
 import type { WeeklyLog, WeeklyReport } from '../types/index.js';
-import type { GeneratorConfig, ModelId } from './types.js';
+import type { GeneratorConfig, ModelId, StreamCallbacks } from './types.js';
 import { MODEL_REGISTRY } from './types.js';
 import { buildMessages, type CustomPromptTemplate } from '../prompt/index.js';
 import { ModelManager } from './model-manager.js';
@@ -155,12 +155,12 @@ export async function generateReport(
 }
 
 /**
- * 流式生成周报
+ * 流式生成周报（支持思考过程回调）
  */
 export async function generateReportStream(
   weeklyLog: WeeklyLog,
   config: GeneratorConfig,
-  onChunk: (chunk: string) => void,
+  callbacks: StreamCallbacks | ((chunk: string) => void),
   options?: GenerateOptions
 ): Promise<GenerateResult> {
   const messages = buildMessages(weeklyLog, options?.customTemplate);
@@ -169,7 +169,7 @@ export async function generateReportStream(
     primary: config.primary,
   });
 
-  const { content, modelId } = await manager.generateStream(messages, onChunk);
+  const { content, modelId } = await manager.generateStream(messages, callbacks);
   const report = parseReportFromMarkdown(content);
   const modelMeta = MODEL_REGISTRY[modelId];
 

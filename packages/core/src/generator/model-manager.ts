@@ -3,7 +3,7 @@
  * 负责模型调用
  */
 
-import type { ChatMessage, ModelConfig, ModelId } from './types.js';
+import type { ChatMessage, ModelConfig, ModelId, StreamCallbacks } from './types.js';
 import { GeneratorError, MODEL_REGISTRY } from './types.js';
 import { createProvider } from './providers/index.js';
 
@@ -49,11 +49,11 @@ export class ModelManager {
   }
 
   /**
-   * 流式生成回复
+   * 流式生成回复（支持思考过程回调）
    */
   async generateStream(
     messages: ChatMessage[],
-    onChunk: (chunk: string) => void
+    callbacks: StreamCallbacks | ((chunk: string) => void)
   ): Promise<{ content: string; modelId: ModelId }> {
     const meta = MODEL_REGISTRY[this.config.modelId];
     const displayName = meta?.name || this.config.modelId;
@@ -61,7 +61,7 @@ export class ModelManager {
     try {
       console.log(`[ModelManager] 尝试使用 ${displayName} (流式)`);
       const provider = createProvider(this.config.modelId);
-      const content = await provider.generateStream(messages, this.config, onChunk);
+      const content = await provider.generateStream(messages, this.config, callbacks);
       console.log(`[ModelManager] ${displayName} 流式生成成功`);
       return { content, modelId: this.config.modelId };
     } catch (error) {
