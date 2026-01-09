@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "tsc --watch",
-    "dev:server": "node --watch dist/index.js serve --no-open",
+    "dev:server": "node --watch-path=dist --watch-path=../core/dist dist/index.js serve --no-open",
     "build": "tsc && pnpm build:web",
     "build:web": "cd ../web && pnpm build",
     "lint": "eslint src/",
