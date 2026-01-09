@@ -88,8 +88,8 @@ export default function SettingsLayout() {
           ))}
         </nav>
 
-        {/* 底部版本信息 */}
-        <div className="p-4 border-t border-[#30363d]">
+        {/* 底部版本信息 - 与右侧操作栏等高 */}
+        <div className="h-14 px-4 flex items-center border-t border-[#30363d] shrink-0">
           <div className="text-xs text-[#484f58]">WeekNote v1.0.0</div>
         </div>
       </aside>
