@@ -11,10 +11,62 @@ import {
   reminderScheduler,
   loadHolidayData,
   getAvailableYears,
-  type ChannelsConfig,
+  generateId,
+  type ScheduleTime,
+  type ChannelSchedules,
+  type SaveReminderConfigParams,
 } from '@weeknote/core';
 
 const router: Router = Router();
+
+/**
+ * 验证单个时间点
+ */
+function validateScheduleTime(time: Partial<ScheduleTime>): string | null {
+  if (time.hour !== undefined && (time.hour < 0 || time.hour > 23)) {
+    return '小时必须在 0-23 之间';
+  }
+  if (time.minute !== undefined && (time.minute < 0 || time.minute > 59)) {
+    return '分钟必须在 0-59 之间';
+  }
+  return null;
+}
+
+/**
+ * 验证渠道提醒时间配置
+ */
+function validateChannelSchedules(schedules: Partial<ChannelSchedules>): string | null {
+  if (!schedules.times || !Array.isArray(schedules.times)) {
+    return null; // 没有 times 字段时跳过验证
+  }
+
+  for (let i = 0; i < schedules.times.length; i++) {
+    const time = schedules.times[i];
+    const error = validateScheduleTime(time);
+    if (error) {
+      return `第 ${i + 1} 个提醒时间: ${error}`;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 处理渠道提醒时间，确保每个时间点都有 ID
+ */
+function processChannelSchedules(schedules: Partial<ChannelSchedules> | undefined): ChannelSchedules | undefined {
+  if (!schedules?.times) return undefined;
+
+  return {
+    times: schedules.times.map((time) => ({
+      ...time,
+      id: time.id || generateId(),
+      hour: time.hour ?? 10,
+      minute: time.minute ?? 0,
+      enabled: time.enabled ?? true,
+    })),
+  };
+}
 
 /**
  * 获取提醒配置
@@ -60,7 +112,7 @@ router.get('/', (_req, res) => {
  */
 router.put('/', (req, res) => {
   try {
-    const { enabled, channels, schedules } = req.body;
+    const { enabled, channels } = req.body;
 
     // 验证渠道配置
     if (channels) {
@@ -83,53 +135,68 @@ router.put('/', (req, res) => {
           });
         }
       }
+
+      // 验证钉钉提醒时间
+      if (channels.dingtalk?.schedules) {
+        const error = validateChannelSchedules(channels.dingtalk.schedules);
+        if (error) {
+          return res.status(400).json({ error: `钉钉提醒时间配置无效: ${error}` });
+        }
+      }
+
+      // 验证 Server酱提醒时间
+      if (channels.serverChan?.schedules) {
+        const error = validateChannelSchedules(channels.serverChan.schedules);
+        if (error) {
+          return res.status(400).json({ error: `Server酱提醒时间配置无效: ${error}` });
+        }
+      }
     }
 
-    // 验证提醒时间
-    if (schedules) {
-      const validateSchedule = (schedule: { hour?: number; minute?: number }) => {
-        if (schedule.hour !== undefined && (schedule.hour < 0 || schedule.hour > 23)) {
-          return false;
-        }
-        if (schedule.minute !== undefined && (schedule.minute < 0 || schedule.minute > 59)) {
-          return false;
-        }
-        return true;
+    // 处理渠道配置，构建更新对象
+    interface ChannelUpdate {
+      enabled?: boolean;
+      webhook?: string;
+      secret?: string;
+      sendKey?: string;
+      schedules?: ChannelSchedules;
+    }
+
+    let dingtalkUpdate: ChannelUpdate | undefined;
+    let serverChanUpdate: ChannelUpdate | undefined;
+
+    if (channels?.dingtalk) {
+      dingtalkUpdate = {
+        enabled: channels.dingtalk.enabled ?? false,
+        webhook: channels.dingtalk.webhook?.trim() ?? '',
+        secret: channels.dingtalk.secret?.trim() ?? '',
       };
-
-      if (schedules.morning && !validateSchedule(schedules.morning)) {
-        return res.status(400).json({ error: '无效的上午提醒时间' });
-      }
-      if (schedules.evening && !validateSchedule(schedules.evening)) {
-        return res.status(400).json({ error: '无效的晚间提醒时间' });
+      const schedules = processChannelSchedules(channels.dingtalk.schedules);
+      if (schedules) {
+        dingtalkUpdate.schedules = schedules;
       }
     }
 
-    // 处理渠道配置，进行 trim
-    const processedChannels: Partial<ChannelsConfig> | undefined = channels
-      ? {
-          dingtalk: channels.dingtalk
-            ? {
-                enabled: channels.dingtalk.enabled ?? false,
-                webhook: channels.dingtalk.webhook?.trim() ?? '',
-                secret: channels.dingtalk.secret?.trim() ?? '',
-              }
-            : undefined,
-          serverChan: channels.serverChan
-            ? {
-                enabled: channels.serverChan.enabled ?? false,
-                sendKey: channels.serverChan.sendKey?.trim() ?? '',
-              }
-            : undefined,
-        }
-      : undefined;
+    if (channels?.serverChan) {
+      serverChanUpdate = {
+        enabled: channels.serverChan.enabled ?? false,
+        sendKey: channels.serverChan.sendKey?.trim() ?? '',
+      };
+      const schedules = processChannelSchedules(channels.serverChan.schedules);
+      if (schedules) {
+        serverChanUpdate.schedules = schedules;
+      }
+    }
 
     // 保存配置
-    const newConfig = saveReminderConfig({
+    const params: SaveReminderConfigParams = {
       enabled,
-      channels: processedChannels as ChannelsConfig,
-      schedules,
-    });
+      channels: {
+        dingtalk: dingtalkUpdate,
+        serverChan: serverChanUpdate,
+      },
+    };
+    const newConfig = saveReminderConfig(params);
 
     // 重新加载调度器
     reminderScheduler.reload();
