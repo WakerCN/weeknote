@@ -18,6 +18,7 @@ import {
   isValidModelId,
   type ModelId,
   type ValidationWarning,
+  type StreamCallbacks,
 } from '@weeknote/core';
 import { loadConfig, saveConfig, getPlatformFromModelId, type CLIConfig } from '../config.js';
 import {
@@ -41,13 +42,23 @@ const __dirname = path.dirname(__filename);
 /**
  * 获取 API 配置
  */
-function getApiConfig(overrideModelId?: string) {
+interface GetApiConfigOptions {
+  overrideModelId?: string;
+  thinkingMode?: 'enabled' | 'disabled' | 'auto';
+}
+
+function getApiConfig(options?: GetApiConfigOptions | string) {
+  // 兼容旧的调用方式
+  const opts: GetApiConfigOptions = typeof options === 'string' 
+    ? { overrideModelId: options }
+    : options || {};
+
   const config = loadConfig();
 
   // 确定使用的模型
   const modelId: ModelId =
-    (overrideModelId && isValidModelId(overrideModelId)
-      ? (overrideModelId as ModelId)
+    (opts.overrideModelId && isValidModelId(opts.overrideModelId)
+      ? (opts.overrideModelId as ModelId)
       : config.defaultModel) || DEFAULT_MODEL;
 
   const platform = getPlatformFromModelId(modelId);
@@ -68,12 +79,20 @@ function getApiConfig(overrideModelId?: string) {
   }
 
   // 豆包需要接入点 ID
-  const endpointId = platform === 'doubao' 
+  const endpointId = platform === 'doubao'
     ? (config.doubaoEndpoint || process.env.DOUBAO_ENDPOINT || process.env.ARK_ENDPOINT)
     : undefined;
 
+  // 豆包 Seed 模型支持思考模式
+  const thinkingMode = opts.thinkingMode;
+
   return {
-    primary: { modelId, apiKey, ...(endpointId ? { endpointId } : {}) },
+    primary: { 
+      modelId, 
+      apiKey, 
+      ...(endpointId ? { endpointId } : {}),
+      ...(thinkingMode ? { thinkingMode } : {}),
+    },
   };
 }
 
@@ -417,7 +436,7 @@ export function createServer(): Express {
   // 流式生成周报接口
   app.post('/api/generate/stream', async (req, res) => {
     try {
-      const { dailyLog, modelId } = req.body;
+      const { dailyLog, modelId, thinkingMode } = req.body;
 
       if (!dailyLog || typeof dailyLog !== 'string') {
         return res.status(400).json({ error: 'Daily Log 内容不能为空' });
@@ -432,7 +451,10 @@ export function createServer(): Express {
       // 收集警告信息
       const warnings: ValidationWarning[] = validation.warnings || [];
 
-      const config = getApiConfig(modelId);
+      const config = getApiConfig({ 
+        overrideModelId: modelId,
+        thinkingMode: thinkingMode as 'enabled' | 'disabled' | 'auto' | undefined,
+      });
       if (!config) {
         return res.status(500).json({
           error: '未配置 API Key，请运行 weeknote config init 进行配置',
@@ -446,22 +468,49 @@ export function createServer(): Express {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // 禁用 Nginx 缓冲
+      res.flushHeaders(); // 立即发送响应头
 
       const weeklyLog = parseDailyLog(dailyLog);
 
+      // 判断是否是推理模型
+      const isReasoning = config.primary.modelId.startsWith('doubao/seed-');
+      const thinkingEnabled = isReasoning && thinkingMode !== 'disabled';
+
       console.log(
-        `[API] 开始流式生成，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}`
+        `[API] 开始流式生成，模型: ${config.primary.modelId}，模板: ${activeTemplate.name}${thinkingEnabled ? '，推理模式: ' + (thinkingMode || 'auto') : ''}`
       );
       if (warnings.length > 0) {
         console.log(`[API] 格式警告: ${warnings.map((w) => w.type).join(', ')}`);
       }
 
+      let chunkCount = 0;
+      let thinkingCount = 0;
+
+      // 辅助函数：刷新响应
+      const flushResponse = () => {
+        if (typeof (res as unknown as { flush?: () => void }).flush === 'function') {
+          (res as unknown as { flush: () => void }).flush();
+        }
+      };
+
+      const streamCallbacks: StreamCallbacks = {
+        onChunk: (chunk: string) => {
+          chunkCount++;
+          res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+          flushResponse();
+        },
+        onThinking: thinkingEnabled ? (thinking: string) => {
+          thinkingCount++;
+          res.write(`data: ${JSON.stringify({ thinking })}\n\n`);
+          flushResponse();
+        } : undefined,
+      };
+
       const result = await generateReportStream(
         weeklyLog,
         config,
-        (chunk) => {
-          res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-        },
+        streamCallbacks,
         {
           customTemplate: {
             systemPrompt: activeTemplate.systemPrompt,
@@ -469,6 +518,8 @@ export function createServer(): Express {
           },
         }
       );
+
+      console.log(`[API] 流式生成完成，共 ${chunkCount} 个 chunk${thinkingCount > 0 ? `，${thinkingCount} 个 thinking` : ''}`);
 
       // 发送完成事件（包含警告信息）
       res.write(
