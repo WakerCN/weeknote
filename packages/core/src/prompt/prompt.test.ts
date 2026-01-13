@@ -93,11 +93,11 @@ describe('buildUserPrompt', () => {
     expect(prompt).toContain('下午有个会议');
   });
 
-  it('应该包含注意事项', () => {
+  it('应该包含整理要求', () => {
     const prompt = buildUserPrompt(SAMPLE_WEEKLY_LOG);
 
-    expect(prompt).toContain('按项目或主题归类');
-    expect(prompt).toContain('【备注】内容仅作为背景参考');
+    expect(prompt).toContain('合并同一项目的多天工作');
+    expect(prompt).toContain('过程性工作不算成果');
   });
 });
 
