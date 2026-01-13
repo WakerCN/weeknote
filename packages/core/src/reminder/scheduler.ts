@@ -227,13 +227,26 @@ export class ReminderScheduler {
     const { channels } = this.config;
     const triggers: string[] = [];
 
+    // ANSI 颜色码
+    const colors = {
+      dingtalk: '\x1b[36m', // 青色（钉钉蓝）
+      serverChan: '\x1b[32m', // 绿色（微信绿）
+      reset: '\x1b[0m',
+    };
+
+    // 格式化时间显示：时间 + 可选标签
+    const formatTimeDisplay = (t: { hour: number; minute: number; label?: string }) => {
+      const time = formatTime(t.hour, t.minute);
+      return t.label ? `${time}(${t.label})` : time;
+    };
+
     // 钉钉提醒时间
     if (channels.dingtalk.enabled && channels.dingtalk.webhook) {
       const dingtalkTimes = channels.dingtalk.schedules.times
         .filter((t) => t.enabled)
-        .map((t) => t.label || formatTime(t.hour, t.minute));
+        .map(formatTimeDisplay);
       if (dingtalkTimes.length > 0) {
-        triggers.push(`钉钉: ${dingtalkTimes.join(', ')}`);
+        triggers.push(`${colors.dingtalk}钉钉${colors.reset}: ${dingtalkTimes.join(', ')}`);
       }
     }
 
@@ -241,9 +254,9 @@ export class ReminderScheduler {
     if (channels.serverChan.enabled && channels.serverChan.sendKey) {
       const serverChanTimes = channels.serverChan.schedules.times
         .filter((t) => t.enabled)
-        .map((t) => t.label || formatTime(t.hour, t.minute));
+        .map(formatTimeDisplay);
       if (serverChanTimes.length > 0) {
-        triggers.push(`Server酱: ${serverChanTimes.join(', ')}`);
+        triggers.push(`${colors.serverChan}Server酱${colors.reset}: ${serverChanTimes.join(', ')}`);
       }
     }
 
