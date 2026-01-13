@@ -1,0 +1,33 @@
+{
+  "name": "@weeknote/server",
+  "version": "1.0.0",
+  "description": "WeekNote 多用户后端服务",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "mongoose": "^8.9.5",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "express-validator": "^7.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.7",
+    "typescript": "^5.8.3"
+  },
+  "keywords": [
+    "weeknote",
+    "server",
+    "mongodb",
+    "auth"
+  ],
+  "license": "MIT"
+}
