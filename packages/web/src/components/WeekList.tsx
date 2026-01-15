@@ -178,9 +178,20 @@ export default function WeekList({
   };
 
   const getWeekDates = (weekStart: string, weekEnd: string): string[] => {
+    // 防御性检查
+    if (!weekStart || !weekEnd) {
+      console.warn('[WeekList] getWeekDates 收到无效参数:', { weekStart, weekEnd });
+      return [];
+    }
     const dates: string[] = [];
     const start = new Date(weekStart);
     const end = new Date(weekEnd);
+
+    // 检查日期是否有效
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      console.warn('[WeekList] 无效的日期:', { weekStart, weekEnd });
+      return [];
+    }
 
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       dates.push(d.toISOString().split('T')[0]);
@@ -191,13 +202,13 @@ export default function WeekList({
 
   const hasContent = (date: string): boolean => {
     const record = weekData[date];
-    return !!(
-      record &&
-      (record.plan.length > 0 ||
-        record.result.length > 0 ||
-        record.issues.length > 0 ||
-        record.notes.length > 0)
-    );
+    if (!record) return false;
+    // 防御性检查：确保字段是字符串
+    const plan = record.plan || '';
+    const result = record.result || '';
+    const issues = record.issues || '';
+    const notes = record.notes || '';
+    return plan.length > 0 || result.length > 0 || issues.length > 0 || notes.length > 0;
   };
 
   const isWeekend = (date: string): boolean => {

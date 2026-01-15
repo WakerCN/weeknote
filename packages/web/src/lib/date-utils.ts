@@ -10,6 +10,11 @@ const WEEKDAY_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五
  * 避免 new Date('YYYY-MM-DD') 被解析为 UTC 时间导致的时区问题
  */
 function parseLocalDate(dateStr: string): Date {
+  // 防御性检查：如果传入无效值，返回当前日期
+  if (!dateStr || typeof dateStr !== 'string') {
+    console.warn('[date-utils] parseLocalDate 收到无效参数:', dateStr);
+    return new Date();
+  }
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day);
 }

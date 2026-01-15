@@ -96,19 +96,22 @@ export function useAutoSave<T>({
     onSaveRef.current = onSave;
   }, [onSave]);
 
-  // 计算是否有修改
-  const isDirty = !isEqual(data, initialData);
+  // 用于触发重新计算 isDirty
+  const [dirtyCheckVersion, setDirtyCheckVersion] = useState(0);
+
+  // 计算是否有修改（使用 ref 存储的初始值，这样保存后能正确反映状态）
+  const isDirty = !isEqual(data, initialDataRef.current);
 
   // 同步 dirty 状态到 status
   useEffect(() => {
     if (disabled) return;
-    
+
     if (isDirty && status === 'saved') {
       setStatus('unsaved');
     } else if (!isDirty && status === 'unsaved') {
       setStatus('saved');
     }
-  }, [isDirty, status, disabled]);
+  }, [isDirty, status, disabled, dirtyCheckVersion]);
 
   // 执行保存
   const doSave = useCallback(async (): Promise<boolean> => {
@@ -123,6 +126,8 @@ export function useAutoSave<T>({
       initialDataRef.current = dataRef.current;
       setStatus('saved');
       setLastSavedTime(new Date());
+      // 触发重新计算 isDirty
+      setDirtyCheckVersion((v) => v + 1);
       return true;
     } catch (error) {
       setStatus('unsaved');
@@ -152,6 +157,8 @@ export function useAutoSave<T>({
     isSavingRef.current = false;
     setStatus('saved');
     setLastSavedTime(null);
+    // 触发重新计算 isDirty
+    setDirtyCheckVersion((v) => v + 1);
   }, []);
 
   // 定时自动保存
@@ -191,6 +198,3 @@ export function useAutoSave<T>({
     reset,
   };
 }
-
-
-
