@@ -2,7 +2,7 @@
  * 每日记录页面
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRequest } from 'ahooks';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import { useTransitionNavigate } from '../lib/navigation';
 import WeekList from '../components/WeekList';
 import DayEditor from '../components/DayEditor';
 import DatePicker from '../components/DatePicker';
+import UserMenu from '../components/UserMenu';
 import {
   getWeekSummaries,
   getWeek,
@@ -27,35 +28,37 @@ import { getWeekStart, getWeekDates } from '../lib/date-utils';
 export default function DailyLog() {
   const { date: urlDate } = useParams<{ date?: string }>();
   const navigate = useTransitionNavigate();
-  const [selectedDate, setSelectedDate] = useState(() => {
-    return urlDate || new Date().toISOString().split('T')[0];
-  });
+  
+  // 初始化日期（优先使用 URL 参数）
+  const initialDate = useMemo(() => urlDate || new Date().toISOString().split('T')[0], []);
+  const [selectedDate, setSelectedDate] = useState(initialDate);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart());
-  // 仅在“切换日期”时展示右侧模糊遮罩（保存触发的 refresh 不应该再次模糊）
+  
+  // 当前周的起始日期（用于控制周数据请求，只在周变化时更新）
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(initialDate));
+  
+  // 仅在"切换日期"时展示右侧模糊遮罩
   const [isSwitchingDate, setIsSwitchingDate] = useState(false);
   const dateSwitchRef = useRef<{ target: string | null; sawLoading: boolean }>({
     target: null,
     sawLoading: false,
   });
+  
+  // 记录上一次处理的 URL 日期，避免重复处理
+  const prevUrlDateRef = useRef<string | undefined>(urlDate);
 
-  // 加载周列表
+  // 加载周列表（只在初始化时加载一次）
   const { data: weeksData, refresh: refreshWeeks } = useRequest(getWeekSummaries);
 
-  // 加载当前周数据
+  // 加载当前周数据 - 只在 currentWeekStart 变化时请求
   const { data: weekData, refresh: refreshWeek } = useRequest(
-    () => getWeek(selectedDate),
+    () => getWeek(currentWeekStart),
     {
-      refreshDeps: [selectedDate],
-      onSuccess: (data) => {
-        if (data) {
-          setCurrentWeekStart(data.weekStart);
-        }
-      },
+      refreshDeps: [currentWeekStart],
     }
   );
 
-  // 加载当前日期记录
+  // 加载当前日期记录 - 每次日期变化都请求
   const { data: currentRecord, refresh: refreshRecord, loading: recordLoading } = useRequest(
     () => getDay(selectedDate),
     {
@@ -63,34 +66,45 @@ export default function DailyLog() {
     }
   );
 
-  // 加载统计信息
-  const { data: stats } = useRequest(() => getWeekStats(selectedDate));
+  // 加载统计信息 - 只在周变化时请求
+  const { data: stats } = useRequest(
+    () => getWeekStats(currentWeekStart),
+    {
+      refreshDeps: [currentWeekStart],
+    }
+  );
 
-  // 当URL参数变化时更新选中日期
+  // 当 URL 参数变化时更新选中日期（仅处理真正的变化）
   useEffect(() => {
-    if (urlDate) {
+    if (urlDate && urlDate !== prevUrlDateRef.current) {
+      prevUrlDateRef.current = urlDate;
+      
       if (urlDate !== selectedDate) {
         setIsSwitchingDate(true);
         dateSwitchRef.current = { target: urlDate, sawLoading: false };
         setSelectedDate(urlDate);
+        
+        // 检查是否需要切换周
+        const newWeekStart = getWeekStart(urlDate);
+        if (newWeekStart !== currentWeekStart) {
+          setCurrentWeekStart(newWeekStart);
+        }
       }
     }
-  }, [urlDate, selectedDate]);
+  }, [urlDate, selectedDate, currentWeekStart]);
 
-  // 监听 recordLoading：只有“因切换日期”触发的加载才会驱动 isSwitchingDate 结束
+  // 监听 recordLoading：只有"因切换日期"触发的加载才会驱动 isSwitchingDate 结束
   useEffect(() => {
     const { target, sawLoading } = dateSwitchRef.current;
     if (!isSwitchingDate || !target || target !== selectedDate) return;
 
     if (recordLoading) {
-      // 记录：我们确实进入过 loading（避免在 loading 尚未置 true 前就提前结束）
       if (!sawLoading) {
         dateSwitchRef.current = { target, sawLoading: true };
       }
       return;
     }
 
-    // loading 已结束，并且确实经历过一次 loading：结束“切换日期”遮罩
     if (sawLoading) {
       setIsSwitchingDate(false);
       dateSwitchRef.current = { target: null, sawLoading: false };
@@ -101,8 +115,6 @@ export default function DailyLog() {
   const handleSave = async (date: string, params: SaveDayRecordParams) => {
     try {
       await saveDay(date, params);
-      // 关键：如果用户已切换到其它日期，不要再 refresh 当前日期的 record，
-      // 否则会触发 recordLoading 二次抖动/二次模糊。
       if (date === selectedDate) {
         await refreshRecord();
         await refreshWeek();
@@ -117,12 +129,17 @@ export default function DailyLog() {
   // 选择日期
   const handleSelectDate = (date: string) => {
     if (date === selectedDate) return;
+    
     setIsSwitchingDate(true);
     dateSwitchRef.current = { target: date, sawLoading: false };
     setSelectedDate(date);
-    // 计算并更新该日期所在周的起始日期
-    const weekStart = getWeekStart(date);
-    setCurrentWeekStart(weekStart);
+    
+    // 检查是否需要切换周
+    const newWeekStart = getWeekStart(date);
+    if (newWeekStart !== currentWeekStart) {
+      setCurrentWeekStart(newWeekStart);
+    }
+    
     navigate(`/daily/${date}`, { replace: true });
   };
 
@@ -153,7 +170,6 @@ export default function DailyLog() {
         toast.warning('本周暂无记录');
         return;
       }
-      // 跳转到首页并传递数据
       navigate('/', { state: { dailyLog: text }, scope: 'root' });
       toast.success('已导入到首页');
     } catch (error) {
@@ -163,8 +179,6 @@ export default function DailyLog() {
 
   const weeks: WeekSummary[] = weeksData?.weeks || [];
   const records: Record<string, DailyRecord> = weekData?.days || {};
-  // ahooks/useRequest 在 refreshDeps 变化时可能保留上一份 data，
-  // 为了避免切换日期瞬间把“旧 record”传给新 date，做一次日期校验。
   const safeCurrentRecord =
     currentRecord && currentRecord.date === selectedDate ? currentRecord : null;
 
@@ -196,7 +210,6 @@ export default function DailyLog() {
     if (!currentWeekExists) {
       const weekDates = getWeekDates(currentWeekStart);
       const weekEnd = weekDates[weekDates.length - 1].date;
-      // 插入到合适位置（按日期降序）
       const insertIndex = allWeeks.findIndex((w) => w.weekStart < currentWeekStart);
       const newWeek = {
         fileName: '',
@@ -241,6 +254,7 @@ export default function DailyLog() {
           >
             <Settings className="w-5 h-5" />
           </button>
+          <UserMenu />
         </div>
       </header>
 
@@ -304,4 +318,3 @@ export default function DailyLog() {
     </div>
   );
 }
-
