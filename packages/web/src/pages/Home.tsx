@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { FileText, Calendar, StopCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import SyncScrollEditor from '../components/SyncScrollEditor';
 import PromptPanel from '../components/PromptPanel';
+import UserMenu from '../components/UserMenu';
 import VolcengineLogo from '../assets/logos/volcengine.svg';
 import DeepSeekLogo from '../assets/logos/deepseek.svg';
 import OpenAILogo from '../assets/logos/openai.svg';
@@ -398,6 +399,7 @@ export default function Home() {
               />
             </svg>
           </button>
+          <UserMenu />
         </div>
       </header>
 

@@ -5,6 +5,7 @@
 
 import { NavLink, Outlet } from 'react-router-dom';
 import { useTransitionNavigate } from '../../lib/navigation';
+import UserMenu from '../../components/UserMenu';
 
 // 侧边栏菜单项配置
 const MENU_ITEMS = [
@@ -95,9 +96,16 @@ export default function SettingsLayout() {
       </aside>
 
       {/* 右侧内容区 */}
-      <main className="flex-1 overflow-auto">
-        <div className="settings-content h-full">
-          <Outlet />
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {/* 顶部用户信息栏 */}
+        <div className="h-14 flex items-center justify-end px-6 bg-[#161b22] border-b border-[#30363d] shrink-0">
+          <UserMenu />
+        </div>
+        {/* 设置内容区 */}
+        <div className="flex-1 overflow-auto">
+          <div className="settings-content h-full">
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
