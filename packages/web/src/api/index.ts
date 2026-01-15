@@ -2,7 +2,8 @@
  * API 客户端 - 统一的 HTTP 请求封装
  */
 
-import axios from 'axios';
+import apiClient from '../lib/api-client';
+import { tokenManager } from '../lib/api-client';
 
 // 模型信息类型
 export interface ModelInfo {
@@ -74,57 +75,123 @@ export interface SavePromptParams {
   userPromptTemplate: string;
 }
 
-// 创建 axios 实例
-const api = axios.create({
-  baseURL: '/api',
-  timeout: 60000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
+/**
+ * 响应数据提取器
+ */
+const extractData = (response: any) => response.data;
 
-// 响应拦截器 - 统一错误处理
-api.interceptors.response.use(
-  (response) => response.data,
-  (error) => {
-    const message = error.response?.data?.error || error.message || '请求失败';
-    return Promise.reject(new Error(message));
-  }
-);
+// ========== reminder 返回形态兼容与兜底 ==========
+const DEFAULT_REMINDER_SCHEDULES: ChannelSchedules = {
+  times: [
+    { id: 'default-morning', hour: 10, minute: 5, enabled: true, label: '上午提醒' },
+    { id: 'default-evening', hour: 20, minute: 40, enabled: true, label: '晚间提醒' },
+  ],
+};
+
+const normalizeChannelSchedules = (schedules: any): ChannelSchedules => {
+  const times = Array.isArray(schedules?.times) ? schedules.times : null;
+  if (!times || times.length === 0) return DEFAULT_REMINDER_SCHEDULES;
+  return {
+    times: times.map((t: any, idx: number) => ({
+      id: t?.id ?? `migrated-${idx}-${Math.random().toString(36).slice(2, 8)}`,
+      hour: typeof t?.hour === 'number' ? t.hour : 10,
+      minute: typeof t?.minute === 'number' ? t.minute : 0,
+      enabled: typeof t?.enabled === 'boolean' ? t.enabled : true,
+      label: typeof t?.label === 'string' ? t.label : undefined,
+    })),
+  };
+};
+
+/**
+ * 兼容后端不同返回形态的 reminder 解包器 + 最小兜底
+ * - 旧：直接返回配置对象
+ * - 新：{ success: true, config: {...} }
+ */
+const extractReminderConfig = (data: any): ReminderConfig => {
+  const cfg = data?.config ?? data;
+  const dingtalk = cfg?.channels?.dingtalk ?? {};
+  const serverChan = cfg?.channels?.serverChan ?? {};
+
+  return {
+    enabled: cfg?.enabled ?? false,
+    channels: {
+      dingtalk: {
+        enabled: dingtalk?.enabled ?? false,
+        webhook: dingtalk?.webhook ?? '',
+        secret: dingtalk?.secret ?? '',
+        schedules: normalizeChannelSchedules(dingtalk?.schedules),
+      },
+      serverChan: {
+        enabled: serverChan?.enabled ?? false,
+        sendKey: serverChan?.sendKey ?? '',
+        schedules: normalizeChannelSchedules(serverChan?.schedules),
+      },
+    },
+    updatedAt: cfg?.updatedAt ?? '',
+    scheduler: {
+      running: cfg?.scheduler?.running ?? false,
+    },
+    holidayData: cfg?.holidayData ?? null,
+    availableYears: Array.isArray(cfg?.availableYears) ? cfg.availableYears : [],
+    sendKey: cfg?.sendKey,
+  };
+};
+
+/**
+ * 兼容后端不同返回形态的 config 解包器
+ * - 旧：直接返回配置对象
+ * - 新：{ success: true, config: {...} }
+ */
+const extractConfig = (data: any): AppConfig => {
+  const cfg = data?.config ?? data;
+  // 最小兜底，避免页面在字段缺失时报错
+  return {
+    defaultModel: cfg?.defaultModel ?? null,
+    apiKeys: (cfg?.apiKeys ?? {
+      siliconflow: null,
+      deepseek: null,
+      openai: null,
+      doubao: null,
+    }) as Record<Platform, string | null>,
+    doubaoEndpoint: cfg?.doubaoEndpoint ?? null,
+  };
+};
 
 /**
  * 获取健康状态
  */
 export const getHealth = () =>
-  api.get<unknown, { status: string; configured: boolean; model: string | null }>('/health');
+  apiClient.get('/health').then(extractData);
 
 /**
  * 获取可用模型列表
  */
-export const getModels = () => api.get<unknown, { models: ModelInfo[] }>('/models');
+export const getModels = () => 
+  apiClient.get('/models').then(extractData);
 
 /**
  * 获取配置
  */
-export const getConfig = () => api.get<unknown, AppConfig>('/config');
+export const getConfig = () => 
+  apiClient.get('/config').then(extractData).then(extractConfig);
 
 /**
  * 保存配置
  */
 export const saveConfig = (params: SaveConfigParams) =>
-  api.post<unknown, { success: boolean }>('/config', params);
+  apiClient.put('/config', params).then(extractData).then(extractConfig);
 
 /**
  * 删除 API Key
  */
 export const deleteApiKey = (platform: Platform) =>
-  api.delete<unknown, { success: boolean }>(`/config/apikey/${platform}`);
+  apiClient.delete(`/config/api-key/${platform}`).then(extractData);
 
 /**
  * 生成周报（非流式）
  */
-export const generateReport = (dailyLog: string, modelId?: string) =>
-  api.post<unknown, GenerateResult>('/generate', { dailyLog, modelId });
+export const generateReport = (startDate: string, endDate: string, modelId?: string) =>
+  apiClient.post('/generate', { startDate, endDate, modelId }).then(extractData);
 
 // 流式生成结果
 export interface GenerateStreamResult {
@@ -212,9 +279,18 @@ export async function generateReportStream(
     thinkingMode = dailyLogOrOptions.thinkingMode;
   }
 
+  // 获取 Token
+  const token = tokenManager.getAccessToken();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch('/api/generate/stream', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ 
       dailyLog, 
       modelId: selectedModelId,
@@ -292,31 +368,32 @@ export async function generateReportStream(
 /**
  * 获取所有 Prompt 模板
  */
-export const getPrompts = () => api.get<unknown, PromptsResponse>('/prompts');
+export const getPrompts = () => 
+  apiClient.get('/prompt-template').then(extractData);
 
 /**
  * 创建新模板
  */
 export const createPrompt = (params: SavePromptParams) =>
-  api.post<unknown, { success: boolean; template: PromptTemplate }>('/prompts', params);
+  apiClient.post('/prompt-template', params).then(extractData);
 
 /**
  * 更新模板
  */
 export const updatePrompt = (id: string, params: Partial<SavePromptParams>) =>
-  api.put<unknown, { success: boolean; template: PromptTemplate }>(`/prompts/${id}`, params);
+  apiClient.put(`/prompt-template/${id}`, params).then(extractData);
 
 /**
  * 删除模板
  */
 export const deletePrompt = (id: string) =>
-  api.delete<unknown, { success: boolean }>(`/prompts/${id}`);
+  apiClient.delete(`/prompt-template/${id}`).then(extractData);
 
 /**
  * 激活模板
  */
 export const activatePrompt = (id: string) =>
-  api.post<unknown, { success: boolean }>(`/prompts/${id}/activate`);
+  apiClient.post(`/prompt-template/${id}/activate`).then(extractData);
 
 // ========== 每日记录 API ==========
 
@@ -372,57 +449,60 @@ export interface SaveDayRecordParams {
  * 获取所有周文件列表
  */
 export const getWeekSummaries = () =>
-  api.get<unknown, { weeks: WeekSummary[] }>('/daily-logs/weeks');
+  apiClient.get('/daily-logs/weeks').then(extractData);
 
 /**
- * 获取某周的所有记录
+ * 获取某周的所有记录（云端 API 使用日期范围）
  */
-export const getWeek = (date?: string) =>
-  api.get<unknown, WeeklyLogFile>('/daily-logs/week', {
+export const getWeek = (date?: string) => {
+  // TODO: 需要根据 date 计算 startDate 和 endDate
+  // 临时保持兼容
+  return apiClient.get('/daily-logs/week', {
     params: date ? { date } : {},
-  });
+  }).then(extractData);
+};
 
 /**
  * 获取某天的记录
  */
 export const getDay = (date: string) =>
-  api.get<unknown, DailyRecord | null>(`/daily-logs/day/${date}`);
+  apiClient.get(`/daily-logs/day/${date}`).then((res) => res.data?.record || null);
 
 /**
  * 保存某天的记录
  */
 export const saveDay = (date: string, params: SaveDayRecordParams) =>
-  api.post<unknown, { success: boolean; record: DailyRecord }>(`/daily-logs/day/${date}`, params);
+  apiClient.post(`/daily-logs/day/${date}`, params).then((res) => res.data?.record || null);
 
 /**
  * 导出为文本格式
  */
 export const exportWeek = (date?: string) =>
-  api.get<unknown, { text: string }>('/daily-logs/export', {
+  apiClient.get('/daily-logs/export', {
     params: date ? { date } : {},
-  });
+  }).then(extractData);
 
 /**
  * 获取记录统计
  */
 export const getWeekStats = (date?: string) =>
-  api.get<unknown, WeekStats>('/daily-logs/stats', {
+  apiClient.get('/daily-logs/stats', {
     params: date ? { date } : {},
-  });
+  }).then(extractData);
 
 /**
  * 在资源管理器中打开文件位置
  */
 export const openInExplorer = (date: string) =>
-  api.post<unknown, { success: boolean; opened: string }>('/daily-logs/open-in-explorer', { date });
+  apiClient.post('/daily-logs/open-in-explorer', { date }).then(extractData);
 
 /**
  * 删除某周的记录
  */
 export const deleteWeek = (fileName: string) =>
-  api.delete<unknown, { success: boolean; message: string }>('/daily-logs/week', {
+  apiClient.delete('/daily-logs/week', {
     params: { fileName },
-  });
+  }).then(extractData);
 
 // ========== 提醒功能 API ==========
 
@@ -493,32 +573,43 @@ export interface SaveReminderParams {
 /**
  * 获取提醒配置
  */
-export const getReminder = () => api.get<unknown, ReminderConfig>('/reminder');
+export const getReminder = () => 
+  apiClient
+    .get('/reminder')
+    .then(extractData)
+    .then(extractReminderConfig);
 
 /**
  * 保存提醒配置
  */
 export const saveReminder = (params: SaveReminderParams) =>
-  api.put<unknown, { success: boolean; config: ReminderConfig }>('/reminder', params);
+  apiClient
+    .put('/reminder', params)
+    .then(extractData)
+    .then(extractReminderConfig);
 
 /**
  * 测试 Server酱 推送
  */
 export const testServerChan = (sendKey: string) =>
-  api.post<unknown, { success: boolean; error?: string }>('/reminder/test/server-chan', { sendKey });
+  apiClient
+    .post('/reminder/test/server-chan', { sendKey })
+    .then(extractData);
 
 /**
  * 测试钉钉机器人推送
  */
 export const testDingtalk = (webhook: string, secret?: string) =>
-  api.post<unknown, { success: boolean; error?: string }>('/reminder/test/dingtalk', { webhook, secret });
+  apiClient
+    .post('/reminder/test/dingtalk', { webhook, secret })
+    .then(extractData);
 
 /**
  * 测试推送（兼容旧接口）
  * @deprecated 使用 testServerChan 或 testDingtalk
  */
 export const testReminder = (sendKey: string) =>
-  api.post<unknown, { success: boolean; error?: string }>('/reminder/test', { sendKey });
+  apiClient.post('/reminder/test', { sendKey }).then(extractData);
 
-export default api;
+export default apiClient;
 
