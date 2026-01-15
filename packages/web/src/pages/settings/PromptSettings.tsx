@@ -11,6 +11,7 @@ import {
   updatePrompt,
   deletePrompt,
   activatePrompt,
+  type PromptTemplate,
 } from '../../api';
 import { SettingsCard, SettingsCardHeader, SettingsFooter, Loading } from '../../components/ui';
 import { hasFormChanges } from '../../lib/form-utils';
@@ -54,7 +55,7 @@ export default function PromptSettings() {
       setEditingUserPromptTemplate(defaults?.userPromptTemplate || '');
       originalSnapshot.current = null;
     } else if (selectedId) {
-      const template = templates.find((t) => t.id === selectedId);
+      const template = templates.find((t: PromptTemplate) => t.id === selectedId);
       if (template) {
         setEditingName(template.name);
         setEditingDescription(template.description || '');
@@ -218,7 +219,7 @@ export default function PromptSettings() {
               </div>
             )}
 
-            {templates.map((template) => (
+            {templates.map((template: PromptTemplate) => (
               <button
                 key={template.id}
                 onClick={() => { setIsCreating(false); setSelectedId(template.id); }}

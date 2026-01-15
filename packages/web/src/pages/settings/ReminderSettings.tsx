@@ -244,9 +244,9 @@ export default function ReminderSettings() {
   const { loading, refresh } = useRequest(getReminder, {
     onSuccess: (data) => {
       setConfig(data);
-      const webhook = data.channels?.dingtalk?.webhook || '';
-      const secret = data.channels?.dingtalk?.secret || '';
-      const sendKey = data.channels?.serverChan?.sendKey || '';
+      const webhook = data.channels.dingtalk.webhook || '';
+      const secret = data.channels.dingtalk.secret || '';
+      const sendKey = data.channels.serverChan.sendKey || '';
       
       setDingtalkWebhook(webhook);
       setDingtalkSecret(secret);
@@ -254,13 +254,13 @@ export default function ReminderSettings() {
       
       originalSnapshot.current = {
         enabled: data.enabled,
-        dingtalkEnabled: data.channels?.dingtalk?.enabled || false,
+        dingtalkEnabled: data.channels.dingtalk.enabled || false,
         dingtalkWebhook: webhook,
         dingtalkSecret: secret,
-        dingtalkSchedules: JSON.stringify(data.channels?.dingtalk?.schedules?.times || []),
-        serverChanEnabled: data.channels?.serverChan?.enabled || false,
+        dingtalkSchedules: JSON.stringify(data.channels.dingtalk.schedules?.times || []),
+        serverChanEnabled: data.channels.serverChan.enabled || false,
         serverChanSendKey: sendKey,
-        serverChanSchedules: JSON.stringify(data.channels?.serverChan?.schedules?.times || []),
+        serverChanSchedules: JSON.stringify(data.channels.serverChan.schedules?.times || []),
       };
     },
     onError: (err) => toast.error(err.message || '加载配置失败'),

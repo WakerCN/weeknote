@@ -7,7 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, FileText, MessageSquare, Copy, Check, GripVertical } from 'lucide-react';
 import { useRequest } from 'ahooks';
-import { getPrompts } from '../api';
+import { getPrompts, type PromptTemplate } from '../api';
 import { toast } from 'sonner';
 
 interface PromptPanelProps {
@@ -67,7 +67,7 @@ export default function PromptPanel({ open, onClose, dailyLog }: PromptPanelProp
 
   // 获取当前激活的模板
   const activeTemplate = promptsData?.templates.find(
-    (t) => t.id === promptsData.activeTemplateId
+    (t: PromptTemplate) => t.id === promptsData.activeTemplateId
   );
 
   // 系统提示词

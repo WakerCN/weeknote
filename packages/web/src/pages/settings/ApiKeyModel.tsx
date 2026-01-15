@@ -41,6 +41,21 @@ function maskApiKey(key: string): string {
   return `${key.slice(0, 4)}...${key.slice(-4)}`;
 }
 
+// 兼容后端不同返回形态的 config（以及字段缺失）兜底
+function normalizeConfig(data: any): AppConfig {
+  const cfg = data?.config ?? data;
+  return {
+    defaultModel: cfg?.defaultModel ?? null,
+    apiKeys: (cfg?.apiKeys ?? {
+      siliconflow: null,
+      deepseek: null,
+      openai: null,
+      doubao: null,
+    }) as AppConfig['apiKeys'],
+    doubaoEndpoint: cfg?.doubaoEndpoint ?? null,
+  };
+}
+
 // API Key 卡片组件
 function ApiKeyCard({
   platform,
@@ -354,7 +369,7 @@ export default function ApiKeyModel() {
   const { data: configData, loading: configLoading, refresh: refreshConfig } = useRequest(getConfig);
 
   const models = modelsData?.models || [];
-  const config: AppConfig = configData || { defaultModel: null, apiKeys: { siliconflow: null, deepseek: null, openai: null, doubao: null } };
+  const config: AppConfig = normalizeConfig(configData);
   
   // 只在首次加载（还没有任何数据）时显示全屏 loading
   // 刷新时不显示，避免滚动位置丢失
@@ -416,7 +431,7 @@ export default function ApiKeyModel() {
   const handleSwitchModel = async (modelId: string) => {
     if (modelId === config.defaultModel) return;
 
-    const modelName = models.find((m) => m.id === modelId)?.name || modelId;
+    const modelName = models.find((m: ModelInfo) => m.id === modelId)?.name || modelId;
     setSwitchingModel(modelId);
     try {
       await saveConfig({ defaultModel: modelId });
