@@ -121,9 +121,18 @@ importers:
 
   packages/server:
     dependencies:
+      '@weeknote/core':
+        specifier: workspace:*
+        version: link:../core
       bcryptjs:
         specifier: ^2.4.3
         version: 2.4.3
+      cors:
+        specifier: ^2.8.5
+        version: 2.8.5
+      dotenv:
+        specifier: ^16.4.0
+        version: 16.6.1
       express:
         specifier: ^4.21.0
         version: 4.22.1
@@ -140,6 +149,9 @@ importers:
       '@types/bcryptjs':
         specifier: ^2.4.6
         version: 2.4.6
+      '@types/cors':
+        specifier: ^2.8.17
+        version: 2.8.19
       '@types/express':
         specifier: ^4.17.21
         version: 4.17.25
