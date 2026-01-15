@@ -2,7 +2,10 @@ import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
+import Auth from './pages/Auth';
 import './index.css';
 
 // 路由懒加载：设置页面按需加载，减少首屏体积
@@ -24,31 +27,45 @@ function LoadingFallback() {
 // 使用 createBrowserRouter 以支持 View Transitions API
 const router = createBrowserRouter([
   {
+    path: '/auth',
+    element: <Auth />,
+  },
+  {
     path: '/',
-    element: <Home />,
+    element: (
+      <ProtectedRoute>
+        <Home />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/daily',
     element: (
-      <Suspense fallback={<LoadingFallback />}>
-        <DailyLog />
-      </Suspense>
+      <ProtectedRoute>
+        <Suspense fallback={<LoadingFallback />}>
+          <DailyLog />
+        </Suspense>
+      </ProtectedRoute>
     ),
   },
   {
     path: '/daily/:date',
     element: (
-      <Suspense fallback={<LoadingFallback />}>
-        <DailyLog />
-      </Suspense>
+      <ProtectedRoute>
+        <Suspense fallback={<LoadingFallback />}>
+          <DailyLog />
+        </Suspense>
+      </ProtectedRoute>
     ),
   },
   {
     path: '/settings',
     element: (
-      <Suspense fallback={<LoadingFallback />}>
-        <SettingsLayout />
-      </Suspense>
+      <ProtectedRoute>
+        <Suspense fallback={<LoadingFallback />}>
+          <SettingsLayout />
+        </Suspense>
+      </ProtectedRoute>
     ),
     children: [
       {
@@ -85,34 +102,36 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
-    {/* 全局 Toast 容器 */}
-    <Toaster
-      theme="dark"
-      position="top-center"
-      toastOptions={{
-        style: {
-          background: '#161b22',
-          border: '1px solid #30363d',
-          color: '#f0f6fc',
-        },
-        classNames: {
-          toast: 'font-medium',
-          success:
-            '!bg-[#0d2818] !border-emerald-500/50 !text-emerald-300 [&>svg]:!text-emerald-400',
-          error: '!bg-[#2a1215] !border-red-500/50 !text-red-300 [&>svg]:!text-red-400',
-          warning:
-            '!bg-[#2a2008] !border-yellow-500/50 !text-yellow-300 [&>svg]:!text-yellow-400',
-          info: '!bg-[#0d1a2a] !border-blue-500/50 !text-blue-300 [&>svg]:!text-blue-400',
-          loading: '!bg-[#1a1a1a] !border-gray-500/50 !text-gray-300',
-        },
-      }}
-      icons={{
-        success: <span className="text-emerald-400">✓</span>,
-        error: <span className="text-red-400">✗</span>,
-        warning: <span className="text-yellow-400">⚠</span>,
-        info: <span className="text-blue-400">ℹ</span>,
-      }}
-    />
+    <AuthProvider>
+      <RouterProvider router={router} />
+      {/* 全局 Toast 容器 */}
+      <Toaster
+        theme="dark"
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: '#161b22',
+            border: '1px solid #30363d',
+            color: '#f0f6fc',
+          },
+          classNames: {
+            toast: 'font-medium',
+            success:
+              '!bg-[#0d2818] !border-emerald-500/50 !text-emerald-300 [&>svg]:!text-emerald-400',
+            error: '!bg-[#2a1215] !border-red-500/50 !text-red-300 [&>svg]:!text-red-400',
+            warning:
+              '!bg-[#2a2008] !border-yellow-500/50 !text-yellow-300 [&>svg]:!text-yellow-400',
+            info: '!bg-[#0d1a2a] !border-blue-500/50 !text-blue-300 [&>svg]:!text-blue-400',
+            loading: '!bg-[#1a1a1a] !border-gray-500/50 !text-gray-300',
+          },
+        }}
+        icons={{
+          success: <span className="text-emerald-400">✓</span>,
+          error: <span className="text-red-400">✗</span>,
+          warning: <span className="text-yellow-400">⚠</span>,
+          info: <span className="text-blue-400">ℹ</span>,
+        }}
+      />
+    </AuthProvider>
   </React.StrictMode>
 );
