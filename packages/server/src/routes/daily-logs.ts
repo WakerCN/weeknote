@@ -1,0 +1,483 @@
+/**
+ * 每日记录 API 路由
+ */
+
+import { Router, Response } from 'express';
+import { body, param, query, validationResult } from 'express-validator';
+import mongoose from 'mongoose';
+import { DailyLog, type IDailyLog } from '../db/models/DailyLog.js';
+import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js';
+
+const router: Router = Router();
+
+// 所有路由都需要认证
+router.use(authMiddleware);
+
+// ========== 日期工具函数 ==========
+
+/**
+ * 获取某个日期所在周的周一
+ */
+function getWeekStart(date: Date | string = new Date()): string {
+  const d = typeof date === 'string' ? parseLocalDate(date) : new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return formatLocalDate(d);
+}
+
+/**
+ * 获取周末日期（周日）
+ */
+function getWeekEnd(weekStart: string): string {
+  const d = parseLocalDate(weekStart);
+  d.setDate(d.getDate() + 6);
+  return formatLocalDate(d);
+}
+
+/**
+ * 解析日期字符串为本地 Date
+ */
+function parseLocalDate(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
+ * 格式化 Date 为 YYYY-MM-DD
+ */
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * 获取年份和周数
+ */
+function getWeekInfo(date: Date): { year: number; week: number } {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const week1 = new Date(d.getFullYear(), 0, 4);
+  const week = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  return { year: d.getFullYear(), week };
+}
+
+/**
+ * 处理验证错误
+ */
+function handleValidationErrors(req: AuthRequest, res: Response): boolean {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    res.status(400).json({
+      error: '参数验证失败',
+      details: errors.array().map((e) => ({
+        field: 'path' in e ? e.path : 'unknown',
+        message: e.msg,
+      })),
+    });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * GET /api/daily-logs/day/:date
+ * 获取某天的记录
+ */
+router.get(
+  '/day/:date',
+  [param('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('日期格式应为 YYYY-MM-DD')],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (handleValidationErrors(req, res)) return;
+
+      const userId = new mongoose.Types.ObjectId(req.user!.userId);
+      const { date } = req.params;
+
+      const record = await DailyLog.findByUserAndDate(userId, date);
+
+      res.json({
+        success: true,
+        record: record || null,
+      });
+    } catch (error) {
+      console.error('[Daily Log] 获取记录失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '获取记录失败',
+      });
+    }
+  }
+);
+
+/**
+ * 获取日期的星期几
+ */
+function getDayOfWeek(dateStr: string): string {
+  const WEEKDAY_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const d = parseLocalDate(dateStr);
+  return WEEKDAY_NAMES[d.getDay()];
+}
+
+/**
+ * POST /api/daily-logs/day/:date
+ * 保存某天的记录
+ */
+router.post(
+  '/day/:date',
+  [
+    param('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('日期格式应为 YYYY-MM-DD'),
+    // dayOfWeek 改为可选，后端自动计算
+    body('dayOfWeek').optional().isIn(['周一', '周二', '周三', '周四', '周五', '周六', '周日']),
+    body('plan').optional().isString(),
+    body('result').optional().isString(),
+    body('issues').optional().isString(),
+    body('notes').optional().isString(),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (handleValidationErrors(req, res)) return;
+
+      const userId = new mongoose.Types.ObjectId(req.user!.userId);
+      const { date } = req.params;
+      const { plan, result, issues, notes } = req.body;
+      // 自动计算 dayOfWeek，如果前端没传的话
+      const dayOfWeek = req.body.dayOfWeek || getDayOfWeek(date);
+
+      // 验证日期不能是未来
+      const dateObj = new Date(date);
+      const today = new Date();
+      today.setHours(23, 59, 59, 999);
+      if (dateObj > today) {
+        res.status(400).json({ error: '不能记录未来的日期' });
+        return;
+      }
+
+      // 使用 findOneAndUpdate 实现 upsert（插入或更新）
+      const record = await DailyLog.findOneAndUpdate(
+        { userId, date },
+        {
+          userId,
+          date,
+          dayOfWeek,
+          plan: plan || '',
+          result: result || '',
+          issues: issues || '',
+          notes: notes || '',
+        },
+        { upsert: true, new: true }
+      );
+
+      console.log(`[Daily Log] 保存记录: ${req.user!.email} - ${date}`);
+
+      res.json({
+        success: true,
+        record,
+      });
+    } catch (error) {
+      console.error('[Daily Log] 保存记录失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '保存记录失败',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/daily-logs/range
+ * 获取指定时间段的记录
+ */
+router.get(
+  '/range',
+  [
+    query('startDate')
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('开始日期格式应为 YYYY-MM-DD'),
+    query('endDate').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('结束日期格式应为 YYYY-MM-DD'),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (handleValidationErrors(req, res)) return;
+
+      const userId = new mongoose.Types.ObjectId(req.user!.userId);
+      const { startDate, endDate } = req.query as { startDate: string; endDate: string };
+
+      // 验证日期范围
+      if (startDate > endDate) {
+        res.status(400).json({ error: '开始日期不能晚于结束日期' });
+        return;
+      }
+
+      const records = await DailyLog.findByUserAndDateRange(userId, startDate, endDate);
+
+      // 计算统计信息
+      const filled = records.filter((r) => {
+        return r.plan.trim() || r.result.trim() || r.issues.trim() || r.notes.trim();
+      }).length;
+
+      res.json({
+        success: true,
+        records,
+        stats: {
+          total: records.length,
+          filled,
+          startDate,
+          endDate,
+        },
+      });
+    } catch (error) {
+      console.error('[Daily Log] 获取时间段记录失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '获取记录失败',
+      });
+    }
+  }
+);
+
+/**
+ * DELETE /api/daily-logs/day/:date
+ * 删除某天的记录
+ */
+router.delete(
+  '/day/:date',
+  [param('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('日期格式应为 YYYY-MM-DD')],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (handleValidationErrors(req, res)) return;
+
+      const userId = new mongoose.Types.ObjectId(req.user!.userId);
+      const { date } = req.params;
+
+      const result = await DailyLog.deleteOne({ userId, date });
+
+      if (result.deletedCount === 0) {
+        res.status(404).json({ error: '记录不存在' });
+        return;
+      }
+
+      console.log(`[Daily Log] 删除记录: ${req.user!.email} - ${date}`);
+
+      res.json({
+        success: true,
+        message: '删除成功',
+      });
+    } catch (error) {
+      console.error('[Daily Log] 删除记录失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '删除记录失败',
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/daily-logs/weeks
+ * 获取所有周的摘要列表
+ */
+router.get('/weeks', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user!.userId);
+
+    // 获取用户所有记录，按日期降序
+    const records = await DailyLog.find({ userId }).sort({ date: -1 });
+
+    // 按周分组
+    const weekMap = new Map<string, {
+      weekStart: string;
+      weekEnd: string;
+      year: number;
+      week: number;
+      filledDays: number;
+      lastUpdated: Date;
+    }>();
+
+    for (const record of records) {
+      const weekStart = getWeekStart(record.date);
+      if (!weekMap.has(weekStart)) {
+        const weekEnd = getWeekEnd(weekStart);
+        const { year, week } = getWeekInfo(parseLocalDate(weekStart));
+        weekMap.set(weekStart, {
+          weekStart,
+          weekEnd,
+          year,
+          week,
+          filledDays: 0,
+          lastUpdated: record.updatedAt,
+        });
+      }
+      const weekInfo = weekMap.get(weekStart)!;
+      // 只有有内容的记录才算填充
+      if (record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim()) {
+        weekInfo.filledDays++;
+      }
+      if (record.updatedAt > weekInfo.lastUpdated) {
+        weekInfo.lastUpdated = record.updatedAt;
+      }
+    }
+
+    // 转换为数组并按周开始日期降序排序
+    const weeks = Array.from(weekMap.values())
+      .sort((a, b) => b.weekStart.localeCompare(a.weekStart))
+      .map((w) => ({
+        fileName: `${w.year}-W${String(w.week).padStart(2, '0')}.json`,
+        year: w.year,
+        week: w.week,
+        weekStart: w.weekStart,
+        weekEnd: w.weekEnd,
+        filledDays: w.filledDays,
+        lastUpdated: w.lastUpdated.toISOString(),
+      }));
+
+    res.json({ weeks });
+  } catch (error) {
+    console.error('[Daily Log] 获取周列表失败:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : '获取周列表失败',
+    });
+  }
+});
+
+/**
+ * GET /api/daily-logs/week
+ * 获取某周的所有记录
+ */
+router.get('/week', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user!.userId);
+    const dateParam = (req.query.date as string) || formatLocalDate(new Date());
+    const weekStart = getWeekStart(dateParam);
+    const weekEnd = getWeekEnd(weekStart);
+    const { year, week } = getWeekInfo(parseLocalDate(weekStart));
+
+    const records = await DailyLog.findByUserAndDateRange(userId, weekStart, weekEnd);
+
+    // 转换为 { date: record } 格式
+    const days: Record<string, IDailyLog> = {};
+    for (const record of records) {
+      days[record.date] = record;
+    }
+
+    res.json({
+      version: 1,
+      year,
+      week,
+      weekStart,
+      weekEnd,
+      days,
+      createdAt: records.length > 0 ? records[0].createdAt : new Date().toISOString(),
+      updatedAt: records.length > 0 ? records[records.length - 1].updatedAt : new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('[Daily Log] 获取周记录失败:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : '获取周记录失败',
+    });
+  }
+});
+
+/**
+ * GET /api/daily-logs/export
+ * 导出某周的记录为文本格式
+ */
+router.get('/export', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user!.userId);
+    const dateParam = (req.query.date as string) || formatLocalDate(new Date());
+    const weekStart = getWeekStart(dateParam);
+    const weekEnd = getWeekEnd(weekStart);
+
+    const records = await DailyLog.findByUserAndDateRange(userId, weekStart, weekEnd);
+
+    if (records.length === 0) {
+      res.json({ text: '' });
+      return;
+    }
+
+    // 生成文本格式
+    const lines: string[] = [];
+    for (const record of records) {
+      const hasContent = record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim();
+      if (!hasContent) continue;
+
+      lines.push(`## ${record.date} ${record.dayOfWeek}`);
+      lines.push('');
+
+      if (record.plan.trim()) {
+        lines.push('### Plan');
+        lines.push(record.plan.trim());
+        lines.push('');
+      }
+      if (record.result.trim()) {
+        lines.push('### Result');
+        lines.push(record.result.trim());
+        lines.push('');
+      }
+      if (record.issues.trim()) {
+        lines.push('### Issues');
+        lines.push(record.issues.trim());
+        lines.push('');
+      }
+      if (record.notes.trim()) {
+        lines.push('### Notes');
+        lines.push(record.notes.trim());
+        lines.push('');
+      }
+    }
+
+    res.json({ text: lines.join('\n') });
+  } catch (error) {
+    console.error('[Daily Log] 导出失败:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : '导出失败',
+    });
+  }
+});
+
+/**
+ * GET /api/daily-logs/stats
+ * 获取某周的统计信息
+ */
+router.get('/stats', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user!.userId);
+    const dateParam = (req.query.date as string) || formatLocalDate(new Date());
+    const weekStart = getWeekStart(dateParam);
+    const weekEnd = getWeekEnd(weekStart);
+
+    const records = await DailyLog.findByUserAndDateRange(userId, weekStart, weekEnd);
+
+    // 计算填充天数
+    let filledDays = 0;
+    let weekdaysFilled = 0;
+
+    for (const record of records) {
+      const hasContent = record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim();
+      if (hasContent) {
+        filledDays++;
+        // 判断是否工作日（周一到周五）
+        const d = parseLocalDate(record.date);
+        const dayOfWeek = d.getDay();
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          weekdaysFilled++;
+        }
+      }
+    }
+
+    res.json({
+      weekStart,
+      weekEnd,
+      filledDays,
+      weekdaysFilled,
+      totalDays: 7,
+    });
+  } catch (error) {
+    console.error('[Daily Log] 获取统计失败:', error);
+    res.status(500).json({
+      error: error instanceof Error ? error.message : '获取统计失败',
+    });
+  }
+});
+
+export default router;

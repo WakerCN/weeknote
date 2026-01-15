@@ -25,10 +25,10 @@ export interface IDailyLog extends Document {
  */
 export interface IDailyLogModel extends Model<IDailyLog> {
   findByUserAndDate(userId: mongoose.Types.ObjectId, date: string): Promise<IDailyLog | null>;
-  findByUserAndWeek(
+  findByUserAndDateRange(
     userId: mongoose.Types.ObjectId,
-    weekStart: string,
-    weekEnd: string
+    startDate: string,
+    endDate: string
   ): Promise<IDailyLog[]>;
 }
 
@@ -96,16 +96,16 @@ DailyLogSchema.statics.findByUserAndDate = function (
 };
 
 /**
- * 静态方法：查询用户某周的所有记录
+ * 静态方法：查询用户指定时间段的所有记录
  */
-DailyLogSchema.statics.findByUserAndWeek = function (
+DailyLogSchema.statics.findByUserAndDateRange = function (
   userId: mongoose.Types.ObjectId,
-  weekStart: string,
-  weekEnd: string
+  startDate: string,
+  endDate: string
 ): Promise<IDailyLog[]> {
   return this.find({
     userId,
-    date: { $gte: weekStart, $lte: weekEnd },
+    date: { $gte: startDate, $lte: endDate },
   }).sort({ date: 1 });
 };
 
