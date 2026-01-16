@@ -521,48 +521,6 @@ export default function ReminderSettings() {
             </div>
           </SettingsCard>
 
-          {/* 节假日数据 */}
-          <SettingsCard>
-            <SettingsCardHeader title="节假日数据" />
-            {config.holidayData ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-emerald-400">✓</span>
-                  <span className="text-[#f0f6fc]">{config.holidayData.year}年数据已加载</span>
-                </div>
-                <p className="text-sm text-[#8b949e]">数据来源：{config.holidayData.source}</p>
-                <p className="text-xs text-[#484f58]">
-                  更新时间：{config.holidayData.updatedAt} · {config.holidayData.holidaysCount} 个节假日 · {config.holidayData.workdaysCount} 个调休工作日
-                </p>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="text-yellow-400">⚠</span>
-                <span className="text-[#8b949e]">当前年份暂无节假日数据，将使用周末判断</span>
-              </div>
-            )}
-          </SettingsCard>
-
-          {/* 调度器状态 */}
-          <SettingsCard>
-            <SettingsCardHeader title="定时任务状态" />
-            <div className="flex items-center gap-2">
-              {config.scheduler.running ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-emerald-400">运行中</span>
-                </>
-              ) : (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-[#484f58]" />
-                  <span className="text-[#8b949e]">未运行</span>
-                </>
-              )}
-            </div>
-            {!config.scheduler.running && config.enabled && (
-              <p className="text-xs text-yellow-400 mt-2">💡 保存配置后定时任务将自动启动</p>
-            )}
-          </SettingsCard>
         </div>
       </main>
 
