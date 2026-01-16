@@ -17,6 +17,7 @@ import configRouter from './routes/config.js';
 import generationRouter from './routes/generation.js';
 import reminderRouter from './routes/reminder.js';
 import { MODEL_REGISTRY } from '@weeknote/core';
+import { cloudReminderScheduler } from './services/reminder-scheduler.js';
 
 // 加载环境变量
 dotenv.config();
@@ -104,6 +105,9 @@ async function startServer() {
     console.log('[Server] 正在连接 MongoDB...');
     await connectDB();
     console.log('[Server] MongoDB 连接成功');
+
+    // 启动提醒调度器
+    cloudReminderScheduler.start();
 
     // 启动 HTTP 服务器
     app.listen(PORT, () => {
