@@ -128,11 +128,6 @@ const extractReminderConfig = (data: any): ReminderConfig => {
       },
     },
     updatedAt: cfg?.updatedAt ?? '',
-    scheduler: {
-      running: cfg?.scheduler?.running ?? false,
-    },
-    holidayData: cfg?.holidayData ?? null,
-    availableYears: Array.isArray(cfg?.availableYears) ? cfg.availableYears : [],
     sendKey: cfg?.sendKey,
   };
 };
@@ -546,17 +541,6 @@ export interface ReminderConfig {
   enabled: boolean;
   channels: ChannelsConfig;
   updatedAt: string;
-  scheduler: {
-    running: boolean;
-  };
-  holidayData: {
-    year: number;
-    source: string;
-    updatedAt: string;
-    holidaysCount: number;
-    workdaysCount: number;
-  } | null;
-  availableYears: number[];
   /** @deprecated 使用 channels.serverChan.sendKey */
   sendKey?: string;
 }

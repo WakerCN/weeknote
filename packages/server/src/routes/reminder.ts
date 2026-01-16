@@ -158,14 +158,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 
     res.json({
       success: true,
-      config: {
-        ...reminderConfig,
-        // 云端版本不运行本地调度器
-        scheduler: { running: false },
-        // 云端版本不需要节假日数据
-        holidayData: null,
-        availableYears: [],
-      },
+      config: reminderConfig,
     });
   } catch (error) {
     console.error('[Reminder] 获取配置失败:', error);
@@ -291,12 +284,7 @@ router.put(
 
       res.json({
         success: true,
-        config: {
-          ...newReminderConfig,
-          scheduler: { running: false },
-          holidayData: null,
-          availableYears: [],
-        },
+        config: newReminderConfig,
       });
     } catch (error) {
       console.error('[Reminder] 更新配置失败:', error);
