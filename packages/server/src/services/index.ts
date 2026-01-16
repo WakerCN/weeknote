@@ -1,10 +1,9 @@
 /**
  * 业务服务层
- * Phase 3 实现具体服务
  */
 
-// Phase 3 将添加:
-// export * from './user.service.js';
-// export * from './daily-log.service.js';
+// 节假日服务
+export { holidayService, type WorkdayInfo } from './holiday-service.js';
 
-export {};
+// 云端提醒调度器
+export { CloudReminderScheduler, cloudReminderScheduler } from './reminder-scheduler.js';
