@@ -2,23 +2,48 @@
 
 # WeekNote 云端版本快速启动脚本
 
-# 加载 nvm 并使用项目指定的 Node 版本
+# 加载 nvm
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 
-# 如果存在 .nvmrc，自动切换到对应版本
-if [ -f ".nvmrc" ]; then
-  nvm use
-fi
+# 切换到 Node 18 并强制设置 PATH
+nvm use 18
 
-# 确保使用 nvm 管理的 Node，移除 Homebrew Node 的干扰
-export PATH="$NVM_DIR/versions/node/$(node -v)/bin:$PATH"
+# 关键：直接从 nvm 获取 Node 18 的完整路径
+NODE18_PATH="$NVM_DIR/versions/node/$(nvm version 18)/bin"
+
+# 强制将 Node 18 路径放在 PATH 最前面
+export PATH="$NODE18_PATH:$PATH"
+
+# 清除 shell 命令缓存和干扰变量
+hash -r
+unset npm_config_prefix
+
+# 验证 Node 版本
+echo "📌 当前 Node 版本: $(node -v)"
+echo "📌 Node 路径: $(which node)"
+
+# 检查是否使用了正确的版本
+CURRENT_NODE_VERSION=$(node -v)
+if [[ ! "$CURRENT_NODE_VERSION" =~ ^v18\. ]]; then
+  echo "❌ 错误: Node 版本不正确，期望 v18.x，实际 $CURRENT_NODE_VERSION"
+  echo ""
+  echo "请手动运行以下命令后重试:"
+  echo "  nvm install 18"
+  echo "  nvm use 18"
+  exit 1
+fi
 
 # 使用淘宝镜像源加速 corepack 下载
 export COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
 
-# 启用 corepack
-corepack enable 2>/dev/null || true
+# 启用 corepack 并准备 pnpm（使用当前 Node 18 环境）
+"$NODE18_PATH/corepack" enable 2>/dev/null || corepack enable 2>/dev/null || true
+"$NODE18_PATH/corepack" prepare pnpm@9.15.9 --activate 2>/dev/null || true
+
+# 验证 pnpm
+echo "📌 当前 pnpm 版本: $(pnpm -v)"
+echo ""
 
 echo "============================================================"
 echo "  WeekNote 云端版本启动脚本"
