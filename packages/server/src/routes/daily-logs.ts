@@ -379,28 +379,60 @@ router.get('/week', async (req: AuthRequest, res: Response) => {
 
 /**
  * GET /api/daily-logs/export
- * 导出某周的记录为文本格式
+ * 导出记录为文本格式（支持日期范围或按周导出）
+ * 
+ * 参数：
+ * - startDate + endDate: 按日期范围导出（新方式）
+ * - date: 按该日期所在周导出（兼容旧方式）
  */
 router.get('/export', async (req: AuthRequest, res: Response) => {
   try {
     const userId = new mongoose.Types.ObjectId(req.user!.userId);
-    const dateParam = (req.query.date as string) || formatLocalDate(new Date());
-    const weekStart = getWeekStart(dateParam);
-    const weekEnd = getWeekEnd(weekStart);
+    
+    let startDate: string;
+    let endDate: string;
 
-    const records = await DailyLog.findByUserAndDateRange(userId, weekStart, weekEnd);
+    // 判断使用哪种方式
+    if (req.query.startDate && req.query.endDate) {
+      // 新方式：按日期范围
+      startDate = req.query.startDate as string;
+      endDate = req.query.endDate as string;
+      
+      // 验证日期格式
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+      if (!datePattern.test(startDate) || !datePattern.test(endDate)) {
+        res.status(400).json({ error: '日期格式应为 YYYY-MM-DD' });
+        return;
+      }
+      
+      // 验证日期范围
+      if (startDate > endDate) {
+        res.status(400).json({ error: '开始日期不能晚于结束日期' });
+        return;
+      }
+    } else {
+      // 兼容旧方式：按周导出
+      const dateParam = (req.query.date as string) || formatLocalDate(new Date());
+      startDate = getWeekStart(dateParam);
+      endDate = getWeekEnd(startDate);
+    }
+
+    const records = await DailyLog.findByUserAndDateRange(userId, startDate, endDate);
 
     if (records.length === 0) {
-      res.json({ text: '' });
+      res.json({ text: '', startDate, endDate, filledDays: 0 });
       return;
     }
 
     // 生成文本格式
     const lines: string[] = [];
+    let filledDays = 0;
+    
     for (const record of records) {
       const hasContent = record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim();
       if (!hasContent) continue;
 
+      filledDays++;
       lines.push(`## ${record.date} ${record.dayOfWeek}`);
       lines.push('');
 
@@ -426,7 +458,12 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    res.json({ text: lines.join('\n') });
+    res.json({ 
+      text: lines.join('\n'),
+      startDate,
+      endDate,
+      filledDays,
+    });
   } catch (error) {
     console.error('[Daily Log] 导出失败:', error);
     res.status(500).json({
@@ -434,6 +471,60 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
     });
   }
 });
+
+/**
+ * GET /api/daily-logs/month-summary
+ * 获取月份记录摘要（用于日历显示）
+ */
+router.get(
+  '/month-summary',
+  [
+    query('year').isInt({ min: 2000, max: 2100 }).withMessage('年份格式不正确'),
+    query('month').isInt({ min: 1, max: 12 }).withMessage('月份应为 1-12'),
+  ],
+  async (req: AuthRequest, res: Response) => {
+    try {
+      if (handleValidationErrors(req, res)) return;
+
+      const userId = new mongoose.Types.ObjectId(req.user!.userId);
+      const year = parseInt(req.query.year as string, 10);
+      const month = parseInt(req.query.month as string, 10);
+
+      // 计算月份的开始和结束日期
+      const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, month, 0).getDate();
+      const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+      const records = await DailyLog.findByUserAndDateRange(userId, startDate, endDate);
+
+      // 构建每天的记录状态
+      const days: Record<string, { hasContent: boolean }> = {};
+      for (const record of records) {
+        const hasContent = !!(
+          record.plan.trim() ||
+          record.result.trim() ||
+          record.issues.trim() ||
+          record.notes.trim()
+        );
+        days[record.date] = { hasContent };
+      }
+
+      res.json({
+        success: true,
+        year,
+        month,
+        startDate,
+        endDate,
+        days,
+      });
+    } catch (error) {
+      console.error('[Daily Log] 获取月份摘要失败:', error);
+      res.status(500).json({
+        error: error instanceof Error ? error.message : '获取月份摘要失败',
+      });
+    }
+  }
+);
 
 /**
  * GET /api/daily-logs/stats
