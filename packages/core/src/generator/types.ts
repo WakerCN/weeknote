@@ -255,17 +255,3 @@ export interface LLMProvider {
   ): Promise<string>;
 }
 
-// 兼容旧版类型
-/** @deprecated 使用 ModelId */
-export type ModelProvider = 'openai' | 'deepseek' | 'siliconflow';
-
-/** @deprecated 使用 MODEL_REGISTRY */
-export const PROVIDER_DEFAULTS = {
-  openai: { baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o', name: 'OpenAI' },
-  deepseek: { baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat', name: 'DeepSeek' },
-  siliconflow: {
-    baseUrl: 'https://api.siliconflow.cn/v1',
-    model: 'Qwen/Qwen2.5-7B-Instruct',
-    name: '硅基流动',
-  },
-};

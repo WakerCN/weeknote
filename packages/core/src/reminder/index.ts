@@ -13,8 +13,6 @@ export type {
   DingtalkConfig,
   ServerChanConfig,
   ChannelsConfig,
-  LegacyScheduleConfig,
-  LegacyReminderConfig,
   SaveReminderConfigParams,
 } from './types.js';
 

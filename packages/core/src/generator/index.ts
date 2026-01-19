@@ -25,8 +25,6 @@ export {
   getModelMeta,
   isValidModelId,
   isReasoningModel,
-  // 兼容旧版
-  PROVIDER_DEFAULTS,
 } from './types.js';
 
 // Provider 导出

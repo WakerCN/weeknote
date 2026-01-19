@@ -9,8 +9,6 @@ import type {
   ReminderConfig,
   ChannelsConfig,
   ChannelSchedules,
-  ScheduleTime,
-  LegacyReminderConfig,
   SaveReminderConfigParams,
 } from './types.js';
 
@@ -73,110 +71,32 @@ function ensureConfigDir(): void {
 }
 
 /**
- * 检查渠道是否有新版 schedules 结构
- */
-function hasNewSchedulesFormat(channel: unknown): boolean {
-  if (!channel || typeof channel !== 'object') return false;
-  const c = channel as Record<string, unknown>;
-  return (
-    c.schedules !== undefined &&
-    typeof c.schedules === 'object' &&
-    c.schedules !== null &&
-    'times' in (c.schedules as object)
-  );
-}
-
-/**
- * 迁移旧配置到新格式
- */
-function migrateConfig(config: LegacyReminderConfig): ReminderConfig {
-  // 检查是否已经是新格式（渠道内有 schedules.times）
-  const dingtalkHasNewFormat = hasNewSchedulesFormat(config.channels?.dingtalk);
-  const serverChanHasNewFormat = hasNewSchedulesFormat(config.channels?.serverChan);
-
-  // 如果两个渠道都已经有新格式，直接返回
-  if (dingtalkHasNewFormat && serverChanHasNewFormat) {
-    return {
-      enabled: config.enabled ?? DEFAULT_REMINDER_CONFIG.enabled,
-      channels: {
-        dingtalk: {
-          enabled: config.channels?.dingtalk?.enabled ?? false,
-          webhook: config.channels?.dingtalk?.webhook ?? '',
-          secret: config.channels?.dingtalk?.secret ?? '',
-          schedules: config.channels?.dingtalk?.schedules ?? DEFAULT_CHANNEL_SCHEDULES,
-        },
-        serverChan: {
-          enabled: config.channels?.serverChan?.enabled ?? false,
-          sendKey: config.channels?.serverChan?.sendKey ?? '',
-          schedules: config.channels?.serverChan?.schedules ?? DEFAULT_CHANNEL_SCHEDULES,
-        },
-      },
-      updatedAt: config.updatedAt ?? '',
-    };
-  }
-
-  // 需要迁移旧格式：将顶层 schedules.morning/evening 转换为渠道内的 schedules.times
-  const migratedTimes: ScheduleTime[] = [];
-
-  if (config.schedules?.morning) {
-    migratedTimes.push({
-      id: 'migrated-morning',
-      hour: config.schedules.morning.hour,
-      minute: config.schedules.morning.minute,
-      enabled: config.schedules.morning.enabled,
-      label: '上午提醒',
-    });
-  }
-
-  if (config.schedules?.evening) {
-    migratedTimes.push({
-      id: 'migrated-evening',
-      hour: config.schedules.evening.hour,
-      minute: config.schedules.evening.minute,
-      enabled: config.schedules.evening.enabled,
-      label: '晚间提醒',
-    });
-  }
-
-  // 如果没有旧的 schedules，使用默认值
-  const finalTimes = migratedTimes.length > 0 ? migratedTimes : DEFAULT_CHANNEL_SCHEDULES.times;
-
-  // 处理非常旧的格式：只有 sendKey，没有 channels
-  const hasOldSendKey = !!(config.sendKey && config.sendKey.length > 0);
-
-  return {
-    enabled: config.enabled ?? DEFAULT_REMINDER_CONFIG.enabled,
-    channels: {
-      dingtalk: {
-        enabled: config.channels?.dingtalk?.enabled ?? false,
-        webhook: config.channels?.dingtalk?.webhook ?? '',
-        secret: config.channels?.dingtalk?.secret ?? '',
-        schedules: dingtalkHasNewFormat
-          ? config.channels!.dingtalk!.schedules!
-          : { times: finalTimes.map((t) => ({ ...t, id: generateId() })) },
-      },
-      serverChan: {
-        enabled: config.channels?.serverChan?.enabled ?? hasOldSendKey,
-        sendKey: config.channels?.serverChan?.sendKey ?? config.sendKey ?? '',
-        schedules: serverChanHasNewFormat
-          ? config.channels!.serverChan!.schedules!
-          : { times: finalTimes.map((t) => ({ ...t, id: generateId() })) },
-      },
-    },
-    updatedAt: config.updatedAt ?? '',
-  };
-}
-
-/**
  * 读取提醒配置
  */
 export function loadReminderConfig(): ReminderConfig {
   try {
     if (fs.existsSync(REMINDER_CONFIG_FILE)) {
       const content = fs.readFileSync(REMINDER_CONFIG_FILE, 'utf-8');
-      const config = JSON.parse(content) as LegacyReminderConfig;
-      // 迁移并合并默认配置
-      return migrateConfig(config);
+      const config = JSON.parse(content) as ReminderConfig;
+      
+      // 合并默认配置，确保所有字段存在
+      return {
+        enabled: config.enabled ?? DEFAULT_REMINDER_CONFIG.enabled,
+        channels: {
+          dingtalk: {
+            enabled: config.channels?.dingtalk?.enabled ?? false,
+            webhook: config.channels?.dingtalk?.webhook ?? '',
+            secret: config.channels?.dingtalk?.secret ?? '',
+            schedules: config.channels?.dingtalk?.schedules ?? DEFAULT_CHANNEL_SCHEDULES,
+          },
+          serverChan: {
+            enabled: config.channels?.serverChan?.enabled ?? false,
+            sendKey: config.channels?.serverChan?.sendKey ?? '',
+            schedules: config.channels?.serverChan?.schedules ?? DEFAULT_CHANNEL_SCHEDULES,
+          },
+        },
+        updatedAt: config.updatedAt ?? '',
+      };
     }
   } catch (error) {
     console.error('[Reminder] 读取配置文件失败:', error);
@@ -215,9 +135,6 @@ export function saveReminderConfig(config: SaveReminderConfigParams): ReminderCo
     },
     updatedAt: new Date().toISOString(),
   };
-
-  // 新格式不再保存 sendKey 字段
-  delete newConfig.sendKey;
 
   fs.writeFileSync(REMINDER_CONFIG_FILE, JSON.stringify(newConfig, null, 2));
   return newConfig;

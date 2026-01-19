@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { getSystemPrompt, buildUserPrompt, buildMessages, buildPrompt } from './index.js';
+import { buildUserPrompt, buildMessages, DEFAULT_SYSTEM_PROMPT } from './index.js';
 import type { WeeklyLog } from '../types/index.js';
 
 const SAMPLE_WEEKLY_LOG: WeeklyLog = {
@@ -31,29 +31,23 @@ const SAMPLE_WEEKLY_LOG: WeeklyLog = {
   endDate: '12-16',
 };
 
-describe('getSystemPrompt', () => {
-  it('应该返回非空的系统 Prompt', () => {
-    const prompt = getSystemPrompt();
-
-    expect(prompt).toBeTruthy();
-    expect(prompt.length).toBeGreaterThan(100);
+describe('DEFAULT_SYSTEM_PROMPT', () => {
+  it('应该是非空的系统 Prompt', () => {
+    expect(DEFAULT_SYSTEM_PROMPT).toBeTruthy();
+    expect(DEFAULT_SYSTEM_PROMPT.length).toBeGreaterThan(100);
   });
 
   it('应该包含核心原则', () => {
-    const prompt = getSystemPrompt();
-
-    expect(prompt).toContain('100%');
-    expect(prompt).toContain('禁止虚构');
-    expect(prompt).toContain('Notes');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('100%');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('禁止虚构');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('Notes');
   });
 
   it('应该包含输出模板结构', () => {
-    const prompt = getSystemPrompt();
-
-    expect(prompt).toContain('【本周工作总结】');
-    expect(prompt).toContain('【本周输出成果（Deliverables）】');
-    expect(prompt).toContain('【问题 & 风险（Issues & Risks）】');
-    expect(prompt).toContain('【下周工作计划】');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('【本周工作总结】');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('【本周输出成果（Deliverables）】');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('【问题 & 风险（Issues & Risks）】');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('【下周工作计划】');
   });
 });
 
@@ -120,15 +114,6 @@ describe('buildMessages', () => {
     const messages = buildMessages(SAMPLE_WEEKLY_LOG);
 
     expect(messages[1].content).toContain('12-15 | 周一');
-  });
-});
-
-describe('buildPrompt', () => {
-  it('应该返回完整的 Prompt 字符串', () => {
-    const prompt = buildPrompt(SAMPLE_WEEKLY_LOG);
-
-    expect(prompt).toContain('工程师周报整理助手');
-    expect(prompt).toContain('12-15 | 周一');
   });
 });
 

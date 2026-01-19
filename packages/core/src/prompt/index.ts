@@ -95,15 +95,6 @@ export function getDefaultUserPromptTemplate(): string {
 }
 
 /**
- * 获取 AI 系统 Prompt
- * @returns 系统 Prompt 字符串
- * @deprecated 使用 getDefaultSystemPrompt() 代替
- */
-export function getSystemPrompt(): string {
-  return DEFAULT_SYSTEM_PROMPT;
-}
-
-/**
  * 格式化 Daily Log 为 Prompt 内容
  * @param weeklyLog - 解析后的周日志
  * @returns 格式化的 Daily Log 字符串
@@ -179,12 +170,3 @@ export function buildMessages(
   ];
 }
 
-/**
- * 构建完整 Prompt（旧版兼容，返回单个字符串）
- * @param weeklyLog - 解析后的周日志数据
- * @returns 完整的 Prompt 字符串
- * @deprecated 建议使用 buildMessages() 获取结构化消息
- */
-export function buildPrompt(weeklyLog: WeeklyLog): string {
-  return `${DEFAULT_SYSTEM_PROMPT}\n\n${buildUserPrompt(weeklyLog)}`;
-}
