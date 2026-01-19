@@ -2,7 +2,7 @@
  * 认证上下文 - 全局用户状态管理
  */
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import apiClient, { tokenManager } from '../lib/api-client';
 import { toast } from 'sonner';
 
@@ -16,6 +16,11 @@ export interface User {
 }
 
 /**
+ * 导航函数类型
+ */
+type NavigateFunction = (path: string, options?: { replace?: boolean }) => void;
+
+/**
  * 认证上下文类型
  */
 interface AuthContextType {
@@ -25,6 +30,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
+  /** 注册导航函数（供 Router 组件调用） */
+  setNavigate: (navigate: NavigateFunction) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -35,6 +42,14 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigateRef = useRef<NavigateFunction | null>(null);
+
+  /**
+   * 注册导航函数
+   */
+  const setNavigate = useCallback((navigate: NavigateFunction) => {
+    navigateRef.current = navigate;
+  }, []);
 
   /**
    * 获取当前用户信息
@@ -120,13 +135,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /**
    * 登出
+   * 使用 React Router 导航（如果已注册），否则回退到 window.location
    */
-  const logout = () => {
+  const logout = useCallback(() => {
     tokenManager.clearTokens();
     setUser(null);
     toast.success('已退出登录');
-    window.location.href = '/auth';
-  };
+    
+    // 优先使用 React Router 导航
+    if (navigateRef.current) {
+      navigateRef.current('/auth', { replace: true });
+    } else {
+      // 回退方案
+      window.location.href = '/auth';
+    }
+  }, []);
 
   const value: AuthContextType = {
     user,
@@ -135,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     register,
     logout,
+    setNavigate,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
