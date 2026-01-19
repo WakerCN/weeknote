@@ -440,18 +440,43 @@ export interface SaveDayRecordParams {
   notes: string;
 }
 
+// 月份摘要响应类型
+export interface MonthSummary {
+  year: number;
+  month: number;
+  startDate: string;
+  endDate: string;
+  days: Record<string, { hasContent: boolean }>;
+}
+
+// 导出结果类型
+export interface ExportResult {
+  text: string;
+  startDate: string;
+  endDate: string;
+  filledDays: number;
+}
+
+// 日期范围统计类型
+export interface RangeStats {
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  filledDays: number;
+}
+
 /**
  * 获取所有周文件列表
+ * @deprecated 使用 getMonthSummary 替代
  */
 export const getWeekSummaries = () =>
   apiClient.get('/daily-logs/weeks').then(extractData);
 
 /**
  * 获取某周的所有记录（云端 API 使用日期范围）
+ * @deprecated 使用 getDateRange 替代
  */
 export const getWeek = (date?: string) => {
-  // TODO: 需要根据 date 计算 startDate 和 endDate
-  // 临时保持兼容
   return apiClient.get('/daily-logs/week', {
     params: date ? { date } : {},
   }).then(extractData);
@@ -470,7 +495,8 @@ export const saveDay = (date: string, params: SaveDayRecordParams) =>
   apiClient.post(`/daily-logs/day/${date}`, params).then((res) => res.data?.record || null);
 
 /**
- * 导出为文本格式
+ * 导出为文本格式（按周，兼容旧接口）
+ * @deprecated 使用 exportRange 替代
  */
 export const exportWeek = (date?: string) =>
   apiClient.get('/daily-logs/export', {
@@ -478,11 +504,36 @@ export const exportWeek = (date?: string) =>
   }).then(extractData);
 
 /**
- * 获取记录统计
+ * 按日期范围导出为文本格式
+ */
+export const exportRange = (startDate: string, endDate: string): Promise<ExportResult> =>
+  apiClient.get('/daily-logs/export', {
+    params: { startDate, endDate },
+  }).then(extractData);
+
+/**
+ * 获取月份记录摘要（用于日历显示）
+ */
+export const getMonthSummary = (year: number, month: number): Promise<MonthSummary> =>
+  apiClient.get('/daily-logs/month-summary', {
+    params: { year, month },
+  }).then(extractData);
+
+/**
+ * 获取记录统计（按周，兼容旧接口）
+ * @deprecated 使用 getDateRange 获取范围内的统计信息
  */
 export const getWeekStats = (date?: string) =>
   apiClient.get('/daily-logs/stats', {
     params: date ? { date } : {},
+  }).then(extractData);
+
+/**
+ * 获取指定日期范围的记录
+ */
+export const getDateRange = (startDate: string, endDate: string) =>
+  apiClient.get('/daily-logs/range', {
+    params: { startDate, endDate },
   }).then(extractData);
 
 /**
