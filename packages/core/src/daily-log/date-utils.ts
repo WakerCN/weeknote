@@ -8,7 +8,7 @@ const WEEKDAY_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五
  * 将日期字符串解析为本地时间的 Date 对象
  * 避免 new Date('YYYY-MM-DD') 被解析为 UTC 时间导致的时区问题
  */
-function parseLocalDate(dateStr: string): Date {
+export function parseLocalDate(dateStr: string): Date {
   const [year, month, day] = dateStr.split('-').map(Number);
   return new Date(year, month - 1, day);
 }
@@ -16,7 +16,7 @@ function parseLocalDate(dateStr: string): Date {
 /**
  * 格式化 Date 对象为 YYYY-MM-DD 字符串（使用本地时区）
  */
-function formatLocalDate(d: Date): string {
+export function formatLocalDate(d: Date): string {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -26,7 +26,7 @@ function formatLocalDate(d: Date): string {
 /**
  * 将日期参数转换为本地时间的 Date 对象
  */
-function toLocalDate(date: Date | string): Date {
+export function toLocalDate(date: Date | string): Date {
   return typeof date === 'string' ? parseLocalDate(date) : date;
 }
 
