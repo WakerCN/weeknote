@@ -5,6 +5,7 @@ export default {
   theme: {
     extend: {
       colors: {
+        // shadcn/ui 标准颜色
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
@@ -29,6 +30,28 @@ export default {
         popover: {
           DEFAULT: 'hsl(var(--popover))',
           foreground: 'hsl(var(--popover-foreground))',
+        },
+        // 应用专用颜色
+        surface: {
+          base: 'var(--surface-base)',
+          raised: 'var(--surface-raised)',
+          overlay: 'var(--surface-overlay)',
+          sunken: 'var(--surface-sunken)',
+        },
+        'text-color': {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          tertiary: 'var(--text-tertiary)',
+          disabled: 'var(--text-disabled)',
+        },
+        status: {
+          success: 'var(--success)',
+          'success-emphasis': 'var(--success-emphasis)',
+          warning: 'var(--warning)',
+          'warning-emphasis': 'var(--warning-emphasis)',
+          danger: 'var(--danger)',
+          'danger-emphasis': 'var(--danger-emphasis)',
+          info: 'var(--info)',
         },
       },
       borderRadius: {

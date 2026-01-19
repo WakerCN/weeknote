@@ -58,10 +58,10 @@ function EditorSection({
   const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
-    <div className="bg-[#161b22] rounded-lg border border-[#30363d]">
+    <div className="bg-[#161b22] rounded-lg border border-[#30363d] flex flex-col min-[1920px]:min-h-[280px]">
       <button
         onClick={() => setExpanded(!expanded)}
-        className={`w-full flex items-center gap-2 px-4 py-3 bg-[#21262d] hover:bg-[#30363d] transition-colors text-left ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
+        className={`w-full flex items-center gap-2 px-4 py-3 bg-[#21262d] hover:bg-[#30363d] transition-colors text-left flex-shrink-0 ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
       >
         {expanded ? (
           <ChevronDown className="w-4 h-4 text-[#8b949e]" />
@@ -78,7 +78,7 @@ function EditorSection({
       </button>
 
       {expanded && (
-        <div className="p-3">
+        <div className="p-3 flex-1 flex flex-col">
           <MilkdownEditor
             key={editorKey}
             defaultValue={value}
@@ -86,6 +86,7 @@ function EditorSection({
             placeholder={placeholder}
             readOnly={readOnly}
             minHeight="100px"
+            className="flex-1"
           />
         </div>
       )}
@@ -272,7 +273,7 @@ export default function DayEditor({
       </div>
 
       {/* 编辑区域 */}
-      <div className="relative flex-1 overflow-y-auto p-6 space-y-4">
+      <div className="relative flex-1 overflow-y-auto p-6">
         {/* 加载遮罩 */}
         <div
           className={`absolute inset-0 z-10 bg-black/35 backdrop-blur-sm transition-opacity duration-400 ease-out ${
@@ -280,18 +281,21 @@ export default function DayEditor({
           }`}
         />
 
-        {sections.map(({ field, title, icon, placeholder }) => (
-          <EditorSection
-            key={field}
-            title={title}
-            icon={icon}
-            value={values[field]}
-            onChange={(v) => handleChange(field, v)}
-            placeholder={placeholder}
-            editorKey={editorKey}
-            readOnly={loading}
-          />
-        ))}
+        {/* 响应式网格布局：窄屏单列，宽屏(>=1920px) 2x2 */}
+        <div className="grid grid-cols-1 min-[1920px]:grid-cols-2 gap-4">
+          {sections.map(({ field, title, icon, placeholder }) => (
+            <EditorSection
+              key={field}
+              title={title}
+              icon={icon}
+              value={values[field]}
+              onChange={(v) => handleChange(field, v)}
+              placeholder={placeholder}
+              editorKey={editorKey}
+              readOnly={loading}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

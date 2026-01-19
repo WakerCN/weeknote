@@ -7,30 +7,70 @@
 
 @layer base {
   :root {
-    --background: 215 28% 5%; /* #0d1117 */
-    --foreground: 210 29% 95%; /* #f0f6fc */
+    /* ========== 基础色彩系统（GitHub Dark 风格） ========== */
     
-    --muted: 215 19% 12%; /* #161b22 */
-    --muted-foreground: 215 14% 57%; /* #8b949e */
+    /* 表面颜色 */
+    --background: 215 28% 5%; /* #0d1117 - 最深背景 */
+    --foreground: 210 29% 95%; /* #f0f6fc - 主文字 */
+    
+    --muted: 215 19% 12%; /* #161b22 - 次级背景/卡片 */
+    --muted-foreground: 215 14% 57%; /* #8b949e - 次级文字 */
     
     --popover: 215 19% 12%; /* #161b22 */
     --popover-foreground: 210 29% 95%; /* #f0f6fc */
     
+    /* 边框和输入框 */
     --border: 215 14% 21%; /* #30363d */
     --input: 215 14% 21%; /* #30363d */
     
-    --primary: 160 84% 39%; /* emerald-500 */
+    /* 主色调（绿色系） */
+    --primary: 160 84% 39%; /* emerald-500 #10b981 */
     --primary-foreground: 0 0% 100%;
     
+    /* 次级色调 */
     --secondary: 215 14% 17%; /* #21262d */
     --secondary-foreground: 210 29% 95%;
     
+    /* 强调色 */
     --accent: 215 14% 17%; /* #21262d */
     --accent-foreground: 210 29% 95%;
     
+    /* 焦点环 */
     --ring: 211 100% 67%; /* #58a6ff */
     
     --radius: 0.5rem;
+    
+    /* ========== 应用专用颜色变量 ========== */
+    
+    /* 表面层级 */
+    --surface-base: #0d1117;
+    --surface-raised: #161b22;
+    --surface-overlay: #21262d;
+    --surface-sunken: #010409;
+    
+    /* 边框变体 */
+    --border-default: #30363d;
+    --border-muted: #21262d;
+    --border-emphasis: #484f58;
+    
+    /* 文字层级 */
+    --text-primary: #f0f6fc;
+    --text-secondary: #8b949e;
+    --text-tertiary: #6e7681;
+    --text-disabled: #484f58;
+    
+    /* 状态颜色 */
+    --success: #238636;
+    --success-emphasis: #2ea043;
+    --warning: #9e6a03;
+    --warning-emphasis: #bb8009;
+    --danger: #da3633;
+    --danger-emphasis: #f85149;
+    --info: #58a6ff;
+    
+    /* 品牌渐变 */
+    --gradient-brand: linear-gradient(to right, #10b981, #06b6d4);
+    --gradient-brand-hover: linear-gradient(to right, #34d399, #22d3ee);
   }
 }
 
@@ -62,8 +102,8 @@ body {
     Helvetica,
     Arial,
     sans-serif;
-  background-color: #0d1117;
-  color: #c9d1d9;
+  background-color: var(--surface-base);
+  color: var(--text-secondary);
 }
 
 /* Custom scrollbar - GitHub dark style */
@@ -77,23 +117,23 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #30363d;
+  background: var(--border-default);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #484f58;
+  background: var(--border-emphasis);
 }
 
 /* Prose customization */
 .prose pre {
-  background: #161b22 !important;
-  border: 1px solid #30363d;
+  background: var(--surface-raised) !important;
+  border: 1px solid var(--border-default);
   border-radius: 6px;
 }
 
 .prose code {
-  background: #161b22;
+  background: var(--surface-raised);
   padding: 0.2em 0.4em;
   border-radius: 4px;
   font-size: 0.875em;
@@ -113,13 +153,13 @@ body {
 }
 
 .prose li::marker {
-  color: #8b949e;
+  color: var(--text-secondary);
 }
 
 /* Checkbox styles */
 .prose input[type='checkbox'] {
   margin-right: 0.5em;
-  accent-color: #238636;
+  accent-color: var(--success);
 }
 
 /* Table styles */
@@ -129,12 +169,12 @@ body {
 
 .prose th,
 .prose td {
-  border: 1px solid #30363d;
+  border: 1px solid var(--border-default);
   padding: 0.5em 1em;
 }
 
 .prose th {
-  background: #161b22;
+  background: var(--surface-raised);
 }
 
 /* Animation */
