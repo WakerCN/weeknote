@@ -3,85 +3,22 @@
  */
 
 import { Router, Response } from 'express';
-import { body, param, query, validationResult } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import mongoose from 'mongoose';
 import { DailyLog, type IDailyLog } from '../db/models/DailyLog.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js';
+import { authMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
+import {
+  getWeekStart,
+  getWeekEnd,
+  getWeekInfo,
+  parseLocalDate,
+  formatLocalDate,
+} from '@weeknote/core';
 
 const router: Router = Router();
 
 // 所有路由都需要认证
 router.use(authMiddleware);
-
-// ========== 日期工具函数 ==========
-
-/**
- * 获取某个日期所在周的周一
- */
-function getWeekStart(date: Date | string = new Date()): string {
-  const d = typeof date === 'string' ? parseLocalDate(date) : new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return formatLocalDate(d);
-}
-
-/**
- * 获取周末日期（周日）
- */
-function getWeekEnd(weekStart: string): string {
-  const d = parseLocalDate(weekStart);
-  d.setDate(d.getDate() + 6);
-  return formatLocalDate(d);
-}
-
-/**
- * 解析日期字符串为本地 Date
- */
-function parseLocalDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-/**
- * 格式化 Date 为 YYYY-MM-DD
- */
-function formatLocalDate(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * 获取年份和周数
- */
-function getWeekInfo(date: Date): { year: number; week: number } {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
-  const week1 = new Date(d.getFullYear(), 0, 4);
-  const week = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
-  return { year: d.getFullYear(), week };
-}
-
-/**
- * 处理验证错误
- */
-function handleValidationErrors(req: AuthRequest, res: Response): boolean {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.status(400).json({
-      error: '参数验证失败',
-      details: errors.array().map((e) => ({
-        field: 'path' in e ? e.path : 'unknown',
-        message: e.msg,
-      })),
-    });
-    return true;
-  }
-  return false;
-}
 
 /**
  * GET /api/daily-logs/day/:date
@@ -89,11 +26,14 @@ function handleValidationErrors(req: AuthRequest, res: Response): boolean {
  */
 router.get(
   '/day/:date',
-  [param('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('日期格式应为 YYYY-MM-DD')],
+  [
+    param('date')
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('日期格式应为 YYYY-MM-DD'),
+  ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const { date } = req.params;
 
@@ -128,7 +68,9 @@ function getDayOfWeek(dateStr: string): string {
 router.post(
   '/day/:date',
   [
-    param('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('日期格式应为 YYYY-MM-DD'),
+    param('date')
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('日期格式应为 YYYY-MM-DD'),
     // dayOfWeek 改为可选，后端自动计算
     body('dayOfWeek').optional().isIn(['周一', '周二', '周三', '周四', '周五', '周六', '周日']),
     body('plan').optional().isString(),
@@ -136,9 +78,9 @@ router.post(
     body('issues').optional().isString(),
     body('notes').optional().isString(),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
 
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const { date } = req.params;
@@ -195,12 +137,13 @@ router.get(
     query('startDate')
       .matches(/^\d{4}-\d{2}-\d{2}$/)
       .withMessage('开始日期格式应为 YYYY-MM-DD'),
-    query('endDate').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('结束日期格式应为 YYYY-MM-DD'),
+    query('endDate')
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('结束日期格式应为 YYYY-MM-DD'),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const { startDate, endDate } = req.query as { startDate: string; endDate: string };
 
@@ -242,11 +185,14 @@ router.get(
  */
 router.delete(
   '/day/:date',
-  [param('date').matches(/^\d{4}-\d{2}-\d{2}$/).withMessage('日期格式应为 YYYY-MM-DD')],
+  [
+    param('date')
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage('日期格式应为 YYYY-MM-DD'),
+  ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const { date } = req.params;
 
@@ -284,14 +230,17 @@ router.get('/weeks', async (req: AuthRequest, res: Response) => {
     const records = await DailyLog.find({ userId }).sort({ date: -1 });
 
     // 按周分组
-    const weekMap = new Map<string, {
-      weekStart: string;
-      weekEnd: string;
-      year: number;
-      week: number;
-      filledDays: number;
-      lastUpdated: Date;
-    }>();
+    const weekMap = new Map<
+      string,
+      {
+        weekStart: string;
+        weekEnd: string;
+        year: number;
+        week: number;
+        filledDays: number;
+        lastUpdated: Date;
+      }
+    >();
 
     for (const record of records) {
       const weekStart = getWeekStart(record.date);
@@ -309,7 +258,12 @@ router.get('/weeks', async (req: AuthRequest, res: Response) => {
       }
       const weekInfo = weekMap.get(weekStart)!;
       // 只有有内容的记录才算填充
-      if (record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim()) {
+      if (
+        record.plan.trim() ||
+        record.result.trim() ||
+        record.issues.trim() ||
+        record.notes.trim()
+      ) {
         weekInfo.filledDays++;
       }
       if (record.updatedAt > weekInfo.lastUpdated) {
@@ -367,7 +321,8 @@ router.get('/week', async (req: AuthRequest, res: Response) => {
       weekEnd,
       days,
       createdAt: records.length > 0 ? records[0].createdAt : new Date().toISOString(),
-      updatedAt: records.length > 0 ? records[records.length - 1].updatedAt : new Date().toISOString(),
+      updatedAt:
+        records.length > 0 ? records[records.length - 1].updatedAt : new Date().toISOString(),
     });
   } catch (error) {
     console.error('[Daily Log] 获取周记录失败:', error);
@@ -380,7 +335,7 @@ router.get('/week', async (req: AuthRequest, res: Response) => {
 /**
  * GET /api/daily-logs/export
  * 导出记录为文本格式（支持日期范围或按周导出）
- * 
+ *
  * 参数：
  * - startDate + endDate: 按日期范围导出（新方式）
  * - date: 按该日期所在周导出（兼容旧方式）
@@ -388,7 +343,7 @@ router.get('/week', async (req: AuthRequest, res: Response) => {
 router.get('/export', async (req: AuthRequest, res: Response) => {
   try {
     const userId = new mongoose.Types.ObjectId(req.user!.userId);
-    
+
     let startDate: string;
     let endDate: string;
 
@@ -397,14 +352,14 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
       // 新方式：按日期范围
       startDate = req.query.startDate as string;
       endDate = req.query.endDate as string;
-      
+
       // 验证日期格式
       const datePattern = /^\d{4}-\d{2}-\d{2}$/;
       if (!datePattern.test(startDate) || !datePattern.test(endDate)) {
         res.status(400).json({ error: '日期格式应为 YYYY-MM-DD' });
         return;
       }
-      
+
       // 验证日期范围
       if (startDate > endDate) {
         res.status(400).json({ error: '开始日期不能晚于结束日期' });
@@ -427,9 +382,10 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
     // 生成文本格式
     const lines: string[] = [];
     let filledDays = 0;
-    
+
     for (const record of records) {
-      const hasContent = record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim();
+      const hasContent =
+        record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim();
       if (!hasContent) continue;
 
       filledDays++;
@@ -458,7 +414,7 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
       }
     }
 
-    res.json({ 
+    res.json({
       text: lines.join('\n'),
       startDate,
       endDate,
@@ -482,10 +438,9 @@ router.get(
     query('year').isInt({ min: 2000, max: 2100 }).withMessage('年份格式不正确'),
     query('month').isInt({ min: 1, max: 12 }).withMessage('月份应为 1-12'),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const year = parseInt(req.query.year as string, 10);
       const month = parseInt(req.query.month as string, 10);
@@ -544,7 +499,8 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
     let weekdaysFilled = 0;
 
     for (const record of records) {
-      const hasContent = record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim();
+      const hasContent =
+        record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim();
       if (hasContent) {
         filledDays++;
         // 判断是否工作日（周一到周五）

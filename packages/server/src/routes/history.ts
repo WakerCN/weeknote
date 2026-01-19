@@ -3,33 +3,15 @@
  */
 
 import { Router, Response } from 'express';
-import { param, query, validationResult } from 'express-validator';
+import { param, query } from 'express-validator';
 import mongoose from 'mongoose';
 import { GenerationHistory } from '../db/models/GenerationHistory.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js';
+import { authMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
 
 const router: Router = Router();
 
 // 所有路由都需要认证
 router.use(authMiddleware);
-
-/**
- * 处理验证错误
- */
-function handleValidationErrors(req: AuthRequest, res: Response): boolean {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.status(400).json({
-      error: '参数验证失败',
-      details: errors.array().map((e) => ({
-        field: 'path' in e ? e.path : 'unknown',
-        message: e.msg,
-      })),
-    });
-    return true;
-  }
-  return false;
-}
 
 /**
  * GET /api/history
@@ -41,10 +23,9 @@ router.get(
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
     query('skip').optional().isInt({ min: 0 }).toInt(),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const limit = parseInt(req.query.limit as string) || 20;
       const skip = parseInt(req.query.skip as string) || 0;
@@ -80,7 +61,6 @@ router.get(
   [param('id').isMongoId().withMessage('无效的历史记录 ID')],
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
 
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const historyId = req.params.id;
@@ -117,7 +97,6 @@ router.delete(
   [param('id').isMongoId().withMessage('无效的历史记录 ID')],
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
 
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const historyId = req.params.id;

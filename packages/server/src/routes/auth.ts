@@ -2,8 +2,8 @@
  * 认证相关 API 路由
  */
 
-import { Router, Response, Request } from 'express';
-import { body, validationResult } from 'express-validator';
+import { Router, Response } from 'express';
+import { body } from 'express-validator';
 import { User } from '../db/models/User.js';
 import {
   hashPassword,
@@ -12,27 +12,9 @@ import {
   signAccessToken,
   verifyRefreshToken,
 } from '../auth/index.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js';
+import { authMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
 
 const router: Router = Router();
-
-/**
- * 处理验证错误
- */
-function handleValidationErrors(req: Request, res: Response): boolean {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.status(400).json({
-      error: '参数验证失败',
-      details: errors.array().map((e) => ({
-        field: 'path' in e ? e.path : 'unknown',
-        message: e.msg,
-      })),
-    });
-    return true;
-  }
-  return false;
-}
 
 /**
  * POST /api/auth/register
@@ -53,10 +35,9 @@ router.post(
       .isLength({ min: 1, max: 50 })
       .withMessage('用户名长度需要在 1-50 个字符之间'),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      // 验证参数
-      if (handleValidationErrors(req, res)) return;
 
       const { email, password, name } = req.body;
 
@@ -119,11 +100,9 @@ router.post(
       .notEmpty()
       .withMessage('密码不能为空'),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      // 验证参数
-      if (handleValidationErrors(req, res)) return;
-
       const { email, password } = req.body;
 
       // 查找用户
@@ -182,11 +161,9 @@ router.post(
       .notEmpty()
       .withMessage('刷新令牌不能为空'),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      // 验证参数
-      if (handleValidationErrors(req, res)) return;
-
       const { refreshToken } = req.body;
 
       // 验证 Refresh Token
@@ -267,11 +244,9 @@ router.put(
       .isURL()
       .withMessage('头像必须是有效的 URL'),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      // 验证参数
-      if (handleValidationErrors(req, res)) return;
-
       const userId = req.user!.userId;
       const { name, avatar } = req.body;
 
@@ -315,11 +290,9 @@ router.put(
       .isLength({ min: 6, max: 50 })
       .withMessage('新密码长度需要在 6-50 个字符之间'),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      // 验证参数
-      if (handleValidationErrors(req, res)) return;
-
       const userId = req.user!.userId;
       const { currentPassword, newPassword } = req.body;
 

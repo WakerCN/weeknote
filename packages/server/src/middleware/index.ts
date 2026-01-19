@@ -10,3 +10,6 @@ export {
 } from './auth.middleware.js';
 
 export type { AuthRequest } from './auth.middleware.js';
+
+// 验证中间件
+export { validateRequest } from './validation.middleware.js';

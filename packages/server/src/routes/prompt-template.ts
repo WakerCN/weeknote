@@ -3,30 +3,12 @@
  */
 
 import { Router, Response } from 'express';
-import { body, param, query, validationResult } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import mongoose from 'mongoose';
 import { PromptTemplate } from '../db/models/PromptTemplate.js';
-import { authMiddleware, AuthRequest, optionalAuthMiddleware } from '../middleware/auth.middleware.js';
+import { authMiddleware, optionalAuthMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
 
 const router: Router = Router();
-
-/**
- * 处理验证错误
- */
-function handleValidationErrors(req: AuthRequest, res: Response): boolean {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.status(400).json({
-      error: '参数验证失败',
-      details: errors.array().map((e) => ({
-        field: 'path' in e ? e.path : 'unknown',
-        message: e.msg,
-      })),
-    });
-    return true;
-  }
-  return false;
-}
 
 /**
  * GET /api/prompts
@@ -60,10 +42,9 @@ router.get(
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
     query('skip').optional().isInt({ min: 0 }).toInt(),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const limit = parseInt(req.query.limit as string) || 20;
       const skip = parseInt(req.query.skip as string) || 0;
 
@@ -99,7 +80,6 @@ router.get(
   [param('id').isMongoId().withMessage('无效的模板 ID')],
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
 
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const templateId = req.params.id;
@@ -158,10 +138,9 @@ router.post(
       .isIn(['private', 'public'])
       .withMessage('可见性只能是 private 或 public'),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const { name, description, systemPrompt, userPromptTemplate, visibility } = req.body;
 
@@ -215,10 +194,9 @@ router.put(
       }),
     body('visibility').optional().isIn(['private', 'public']),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const templateId = req.params.id;
 
@@ -275,7 +253,6 @@ router.delete(
   [param('id').isMongoId().withMessage('无效的模板 ID')],
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
 
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const templateId = req.params.id;
@@ -325,7 +302,6 @@ router.post(
   [param('id').isMongoId().withMessage('无效的模板 ID')],
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
 
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const templateId = req.params.id;
@@ -378,7 +354,6 @@ router.post(
   [param('id').isMongoId().withMessage('无效的模板 ID')],
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
 
       const templateId = req.params.id;
 

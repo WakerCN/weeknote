@@ -3,10 +3,10 @@
  */
 
 import { Router, Response } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body } from 'express-validator';
 import mongoose from 'mongoose';
 import { User } from '../db/models/User.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js';
+import { authMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
 import {
   sendTestMessage,
   sendDingtalkTestMessage,
@@ -28,24 +28,6 @@ router.use(authMiddleware);
  */
 function generateId(): string {
   return Math.random().toString(36).substring(2, 10);
-}
-
-/**
- * 处理验证错误
- */
-function handleValidationErrors(req: AuthRequest, res: Response): boolean {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.status(400).json({
-      error: '参数验证失败',
-      details: errors.array().map((e) => ({
-        field: 'path' in e ? e.path : 'unknown',
-        message: e.msg,
-      })),
-    });
-    return true;
-  }
-  return false;
 }
 
 /**
@@ -178,10 +160,9 @@ router.put(
     body('enabled').optional().isBoolean(),
     body('channels').optional().isObject(),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const { enabled, channels } = req.body;
 
@@ -304,7 +285,6 @@ router.post(
   [body('sendKey').notEmpty().withMessage('SendKey 不能为空')],
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
 
       const { sendKey } = req.body;
       const trimmedKey = sendKey.trim();
@@ -348,7 +328,6 @@ router.post(
   [body('webhook').notEmpty().withMessage('Webhook 不能为空')],
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
 
       const { webhook, secret } = req.body;
       const trimmedWebhook = webhook.trim();

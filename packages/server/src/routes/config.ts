@@ -3,33 +3,15 @@
  */
 
 import { Router, Response } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body } from 'express-validator';
 import mongoose from 'mongoose';
 import { User } from '../db/models/User.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js';
+import { authMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
 
 const router: Router = Router();
 
 // 所有路由都需要认证
 router.use(authMiddleware);
-
-/**
- * 处理验证错误
- */
-function handleValidationErrors(req: AuthRequest, res: Response): boolean {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.status(400).json({
-      error: '参数验证失败',
-      details: errors.array().map((e) => ({
-        field: 'path' in e ? e.path : 'unknown',
-        message: e.msg,
-      })),
-    });
-    return true;
-  }
-  return false;
-}
 
 /**
  * GET /api/config
@@ -73,10 +55,9 @@ router.put(
     body('doubaoEndpoint').optional().isString(),
     body('reminderConfig').optional().isObject(),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
 
       const user = await User.findById(userId);

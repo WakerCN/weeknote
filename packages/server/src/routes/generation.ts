@@ -3,13 +3,13 @@
  */
 
 import { Router, Response } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body } from 'express-validator';
 import mongoose from 'mongoose';
 import { DailyLog } from '../db/models/DailyLog.js';
 import { GenerationHistory } from '../db/models/GenerationHistory.js';
 import { User } from '../db/models/User.js';
 import { PromptTemplate } from '../db/models/PromptTemplate.js';
-import { authMiddleware, AuthRequest } from '../middleware/auth.middleware.js';
+import { authMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
 import {
   parseDailyLog,
   validateDailyLog,
@@ -25,24 +25,6 @@ const router: Router = Router();
 
 // 所有路由都需要认证
 router.use(authMiddleware);
-
-/**
- * 处理验证错误
- */
-function handleValidationErrors(req: AuthRequest, res: Response): boolean {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    res.status(400).json({
-      error: '参数验证失败',
-      details: errors.array().map((e) => ({
-        field: 'path' in e ? e.path : 'unknown',
-        message: e.msg,
-      })),
-    });
-    return true;
-  }
-  return false;
-}
 
 /**
  * 将 Daily Log 记录格式化为文本
@@ -98,10 +80,9 @@ router.post(
       .isMongoId()
       .withMessage('Prompt 模板 ID 格式不正确'),
   ],
+  validateRequest,
   async (req: AuthRequest, res: Response) => {
     try {
-      if (handleValidationErrors(req, res)) return;
-
       const userId = new mongoose.Types.ObjectId(req.user!.userId);
       const { startDate, endDate, modelId, promptTemplateId } = req.body;
 
