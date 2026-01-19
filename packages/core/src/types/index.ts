@@ -54,17 +54,81 @@ export interface WeeklyReport {
   rawMarkdown: string;
 }
 
+// ========== 共享 API 类型 ==========
+
 /**
- * 简单的 API 配置（用于快速开始）
- * @deprecated 建议使用 generator 模块中的 GeneratorConfig
+ * 平台类型
  */
-export interface SimpleAPIConfig {
-  /** API 密钥 */
-  apiKey: string;
-  /** API 基础 URL（可选） */
-  baseUrl?: string;
-  /** 使用的模型（可选） */
-  model?: string;
-  /** 生成温度参数（可选） */
-  temperature?: number;
+export type Platform = 'siliconflow' | 'deepseek' | 'openai' | 'doubao';
+
+/**
+ * 每日记录 DTO（前后端共享）
+ */
+export interface DailyRecordDTO {
+  date: string;
+  dayOfWeek: string;
+  plan: string;
+  result: string;
+  issues: string;
+  notes: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * 保存每日记录参数
+ */
+export interface SaveDayRecordParams {
+  plan: string;
+  result: string;
+  issues: string;
+  notes: string;
+}
+
+/**
+ * 月份摘要（用于日历显示）
+ */
+export interface MonthSummary {
+  year: number;
+  month: number;
+  startDate: string;
+  endDate: string;
+  days: Record<string, { hasContent: boolean }>;
+}
+
+/**
+ * 导出结果
+ */
+export interface ExportResult {
+  text: string;
+  startDate: string;
+  endDate: string;
+  filledDays: number;
+}
+
+/**
+ * 日期范围统计
+ */
+export interface RangeStats {
+  startDate: string;
+  endDate: string;
+  totalDays: number;
+  filledDays: number;
+}
+
+// ValidationWarning 和 ValidationWarningType 从 parser 模块导出，避免重复定义
+// import { ValidationWarning, ValidationWarningType } from '../parser/index.js';
+
+/**
+ * 生成结果
+ */
+export interface GenerateResultDTO {
+  report: string;
+  model: { id: string; name: string };
+  // 警告类型使用 parser 模块中定义的 ValidationWarning
+  warnings?: Array<{
+    type: string;
+    message: string;
+    suggestion: string;
+  }>;
 }
