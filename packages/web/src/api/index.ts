@@ -128,7 +128,6 @@ const extractReminderConfig = (data: any): ReminderConfig => {
       },
     },
     updatedAt: cfg?.updatedAt ?? '',
-    sendKey: cfg?.sendKey,
   };
 };
 
@@ -219,7 +218,12 @@ export interface GenerateStreamOptions {
   modelId?: string;
   /** 思考模式（推理模型支持：豆包 Seed、DeepSeek R1） */
   thinkingMode?: ThinkingMode;
+  /** 超时时间（毫秒），默认 180000（3分钟） */
+  timeout?: number;
 }
+
+/** 默认超时时间：3分钟（推理模型可能需要较长时间） */
+const DEFAULT_STREAM_TIMEOUT = 180000;
 
 /**
  * 流式生成周报
@@ -258,6 +262,7 @@ export async function generateReportStream(
   let abortSignal: AbortSignal | undefined;
   let selectedModelId: string | undefined;
   let thinkingMode: ThinkingMode | undefined;
+  let timeout: number = DEFAULT_STREAM_TIMEOUT;
 
   if (typeof dailyLogOrOptions === 'string') {
     // 旧的调用方式
@@ -272,7 +277,26 @@ export async function generateReportStream(
     abortSignal = dailyLogOrOptions.signal;
     selectedModelId = dailyLogOrOptions.modelId;
     thinkingMode = dailyLogOrOptions.thinkingMode;
+    timeout = dailyLogOrOptions.timeout ?? DEFAULT_STREAM_TIMEOUT;
   }
+
+  // 创建超时控制器
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => {
+    timeoutController.abort();
+  }, timeout);
+
+  // 组合外部信号和超时信号
+  const combinedSignal = abortSignal
+    ? (() => {
+        const controller = new AbortController();
+        // 监听外部取消
+        abortSignal.addEventListener('abort', () => controller.abort());
+        // 监听超时取消
+        timeoutController.signal.addEventListener('abort', () => controller.abort());
+        return controller.signal;
+      })()
+    : timeoutController.signal;
 
   // 获取 Token
   const token = tokenManager.getAccessToken();
@@ -283,79 +307,99 @@ export async function generateReportStream(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch('/api/generate/stream', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ 
-      dailyLog, 
-      modelId: selectedModelId,
-      ...(thinkingMode ? { thinkingMode } : {}),
-    }),
-    signal: abortSignal,
-  });
+  try {
+    const response = await fetch('/api/generate/stream', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ 
+        dailyLog, 
+        modelId: selectedModelId,
+        ...(thinkingMode ? { thinkingMode } : {}),
+      }),
+      signal: combinedSignal,
+    });
 
-  if (!response.ok) {
-    const data = await response.json();
-    throw new Error(data.error || '生成失败');
-  }
+    // 请求成功后清除超时
+    clearTimeout(timeoutId);
 
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error('无法读取响应流');
-  }
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || '生成失败');
+    }
 
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let result: GenerateStreamResult | null = null;
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('无法读取响应流');
+    }
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let result: GenerateStreamResult | null = null;
 
-    buffer += decoder.decode(value, { stream: true });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    // 处理 SSE 数据
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
+      buffer += decoder.decode(value, { stream: true });
 
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(line.slice(6));
+      // 处理 SSE 数据
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
-          // 处理思考内容
-          if (data.thinking && callbacks.onThinking) {
-            callbacks.onThinking(data.thinking);
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+
+            // 处理思考内容
+            if (data.thinking && callbacks.onThinking) {
+              callbacks.onThinking(data.thinking);
+            }
+
+            // 处理正常内容
+            if (data.chunk) {
+              callbacks.onChunk(data.chunk);
+            }
+
+            if (data.done) {
+              result = {
+                model: data.model,
+                warnings: data.warnings,
+              };
+            }
+
+            if (data.error) {
+              throw new Error(data.error);
+            }
+          } catch (e) {
+            if (e instanceof SyntaxError) continue;
+            throw e;
           }
-
-          // 处理正常内容
-          if (data.chunk) {
-            callbacks.onChunk(data.chunk);
-          }
-
-          if (data.done) {
-            result = {
-              model: data.model,
-              warnings: data.warnings,
-            };
-          }
-
-          if (data.error) {
-            throw new Error(data.error);
-          }
-        } catch (e) {
-          if (e instanceof SyntaxError) continue;
-          throw e;
         }
       }
     }
-  }
 
-  if (!result) {
-    throw new Error('未收到完成信号');
-  }
+    if (!result) {
+      throw new Error('未收到完成信号');
+    }
 
-  return result;
+    return result;
+  } catch (error) {
+    // 清除超时定时器
+    clearTimeout(timeoutId);
+    
+    // 检查是否是超时错误
+    if (error instanceof Error && error.name === 'AbortError') {
+      // 检查是否是超时导致的取消
+      if (timeoutController.signal.aborted) {
+        throw new Error(`请求超时（${Math.round(timeout / 1000)}秒），请稍后重试或选择更快的模型`);
+      }
+      // 用户主动取消
+      throw error;
+    }
+    
+    throw error;
+  }
 }
 
 // ========== Prompt 模板 API ==========
@@ -404,35 +448,6 @@ export interface DailyRecord {
   updatedAt: string;
 }
 
-export interface WeeklyLogFile {
-  version: 1;
-  year: number;
-  week: number;
-  weekStart: string;
-  weekEnd: string;
-  days: Record<string, DailyRecord>;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface WeekSummary {
-  fileName: string;
-  year: number;
-  week: number;
-  weekStart: string;
-  weekEnd: string;
-  filledDays: number;
-  lastUpdated: string;
-}
-
-export interface WeekStats {
-  weekStart: string;
-  weekEnd: string;
-  filledDays: number;
-  weekdaysFilled: number;
-  totalDays: number;
-}
-
 export interface SaveDayRecordParams {
   plan: string;
   result: string;
@@ -466,23 +481,6 @@ export interface RangeStats {
 }
 
 /**
- * 获取所有周文件列表
- * @deprecated 使用 getMonthSummary 替代
- */
-export const getWeekSummaries = () =>
-  apiClient.get('/daily-logs/weeks').then(extractData);
-
-/**
- * 获取某周的所有记录（云端 API 使用日期范围）
- * @deprecated 使用 getDateRange 替代
- */
-export const getWeek = (date?: string) => {
-  return apiClient.get('/daily-logs/week', {
-    params: date ? { date } : {},
-  }).then(extractData);
-};
-
-/**
  * 获取某天的记录
  */
 export const getDay = (date: string) =>
@@ -493,15 +491,6 @@ export const getDay = (date: string) =>
  */
 export const saveDay = (date: string, params: SaveDayRecordParams) =>
   apiClient.post(`/daily-logs/day/${date}`, params).then((res) => res.data?.record || null);
-
-/**
- * 导出为文本格式（按周，兼容旧接口）
- * @deprecated 使用 exportRange 替代
- */
-export const exportWeek = (date?: string) =>
-  apiClient.get('/daily-logs/export', {
-    params: date ? { date } : {},
-  }).then(extractData);
 
 /**
  * 按日期范围导出为文本格式
@@ -517,15 +506,6 @@ export const exportRange = (startDate: string, endDate: string): Promise<ExportR
 export const getMonthSummary = (year: number, month: number): Promise<MonthSummary> =>
   apiClient.get('/daily-logs/month-summary', {
     params: { year, month },
-  }).then(extractData);
-
-/**
- * 获取记录统计（按周，兼容旧接口）
- * @deprecated 使用 getDateRange 获取范围内的统计信息
- */
-export const getWeekStats = (date?: string) =>
-  apiClient.get('/daily-logs/stats', {
-    params: date ? { date } : {},
   }).then(extractData);
 
 /**
@@ -592,8 +572,6 @@ export interface ReminderConfig {
   enabled: boolean;
   channels: ChannelsConfig;
   updatedAt: string;
-  /** @deprecated 使用 channels.serverChan.sendKey */
-  sendKey?: string;
 }
 
 // 保存提醒配置参数
@@ -638,13 +616,6 @@ export const testDingtalk = (webhook: string, secret?: string) =>
   apiClient
     .post('/reminder/test/dingtalk', { webhook, secret })
     .then(extractData);
-
-/**
- * 测试推送（兼容旧接口）
- * @deprecated 使用 testServerChan 或 testDingtalk
- */
-export const testReminder = (sendKey: string) =>
-  apiClient.post('/reminder/test', { sendKey }).then(extractData);
 
 export default apiClient;
 
