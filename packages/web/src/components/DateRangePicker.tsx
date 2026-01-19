@@ -5,6 +5,19 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  formatLocalDate,
+  parseLocalDate,
+  formatShortDate,
+  getWeekStart,
+  getWeekEnd,
+  getLastWeekStart,
+  getLastWeekEnd,
+  getMonthStart,
+  getMonthEnd,
+  getDaysAgo,
+  getDayCount,
+} from '@/lib/date-utils';
 
 interface DateRangePickerProps {
   /** 开始日期 */
@@ -17,112 +30,13 @@ interface DateRangePickerProps {
   filledDays?: number;
 }
 
-/**
- * 格式化日期为 YYYY-MM-DD
- */
-function formatDate(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * 解析日期字符串
- */
-function parseDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-/**
- * 格式化日期为短格式 M/D
- */
-function formatShortDate(dateStr: string): string {
-  const [, month, day] = dateStr.split('-');
-  return `${parseInt(month, 10)}/${parseInt(day, 10)}`;
-}
-
-/**
- * 获取本周一的日期
- */
-function getWeekStart(date: Date = new Date()): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return formatDate(d);
-}
-
-/**
- * 获取本周日的日期
- */
-function getWeekEnd(date: Date = new Date()): string {
-  const weekStart = parseDate(getWeekStart(date));
-  weekStart.setDate(weekStart.getDate() + 6);
-  return formatDate(weekStart);
-}
-
-/**
- * 获取上周一的日期
- */
-function getLastWeekStart(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 7);
-  return getWeekStart(d);
-}
-
-/**
- * 获取上周日的日期
- */
-function getLastWeekEnd(): string {
-  const lastWeekStart = parseDate(getLastWeekStart());
-  lastWeekStart.setDate(lastWeekStart.getDate() + 6);
-  return formatDate(lastWeekStart);
-}
-
-/**
- * 获取本月1号的日期
- */
-function getMonthStart(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
-}
-
-/**
- * 获取本月最后一天
- */
-function getMonthEnd(): string {
-  const d = new Date();
-  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return formatDate(lastDay);
-}
-
-/**
- * 获取N天前的日期
- */
-function getDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days + 1);
-  return formatDate(d);
-}
-
-/**
- * 计算日期范围内的天数
- */
-function getDayCount(startDate: string, endDate: string): number {
-  const start = parseDate(startDate);
-  const end = parseDate(endDate);
-  return Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-}
-
 // 快捷选项
 const QUICK_OPTIONS = [
-  { label: '本周', getRange: () => ({ start: getWeekStart(), end: getWeekEnd() }) },
+  { label: '本周', getRange: () => ({ start: getWeekStart(), end: getWeekEnd(getWeekStart()) }) },
   { label: '上周', getRange: () => ({ start: getLastWeekStart(), end: getLastWeekEnd() }) },
   { label: '本月', getRange: () => ({ start: getMonthStart(), end: getMonthEnd() }) },
-  { label: '近7天', getRange: () => ({ start: getDaysAgo(7), end: formatDate(new Date()) }) },
-  { label: '近30天', getRange: () => ({ start: getDaysAgo(30), end: formatDate(new Date()) }) },
+  { label: '近7天', getRange: () => ({ start: getDaysAgo(7), end: formatLocalDate(new Date()) }) },
+  { label: '近30天', getRange: () => ({ start: getDaysAgo(30), end: formatLocalDate(new Date()) }) },
 ];
 
 /**
@@ -150,7 +64,7 @@ function MonthPanel({
   const calendarData = useMemo(() => {
     const firstDay = new Date(year, month - 1, 1).getDay();
     const daysInMonth = new Date(year, month, 0).getDate();
-    const today = formatDate(new Date());
+    const today = formatLocalDate(new Date());
     
     const days: Array<{
       date: string;
@@ -281,7 +195,7 @@ export default function DateRangePicker({
   
   // 当前显示的月份（左侧面板）
   const [currentMonth, setCurrentMonth] = useState(() => {
-    const d = startDate ? parseDate(startDate) : new Date();
+    const d = startDate ? parseLocalDate(startDate) : new Date();
     return { year: d.getFullYear(), month: d.getMonth() + 1 };
   });
 

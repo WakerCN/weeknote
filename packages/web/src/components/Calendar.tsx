@@ -6,6 +6,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRequest } from 'ahooks';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { getMonthSummary } from '../api';
+import { formatLocalDate, parseLocalDate } from '@/lib/date-utils';
 
 interface CalendarProps {
   /** 当前选中的日期 */
@@ -14,31 +15,13 @@ interface CalendarProps {
   onSelectDate: (date: string) => void;
 }
 
-/**
- * 格式化日期为 YYYY-MM-DD
- */
-function formatDate(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * 解析日期字符串
- */
-function parseDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
 export default function Calendar({
   selectedDate,
   onSelectDate,
 }: CalendarProps) {
   // 当前显示的月份
   const [currentMonth, setCurrentMonth] = useState(() => {
-    const d = selectedDate ? parseDate(selectedDate) : new Date();
+    const d = selectedDate ? parseLocalDate(selectedDate) : new Date();
     return { year: d.getFullYear(), month: d.getMonth() + 1 };
   });
 
@@ -53,7 +36,7 @@ export default function Calendar({
   // 当选中日期变化时，自动切换到对应月份
   useEffect(() => {
     if (selectedDate) {
-      const d = parseDate(selectedDate);
+      const d = parseLocalDate(selectedDate);
       const newMonth = { year: d.getFullYear(), month: d.getMonth() + 1 };
       if (newMonth.year !== currentMonth.year || newMonth.month !== currentMonth.month) {
         setCurrentMonth(newMonth);
@@ -84,7 +67,7 @@ export default function Calendar({
       isWeekend: boolean;
     }> = [];
 
-    const today = formatDate(new Date());
+    const today = formatLocalDate(new Date());
 
     // 填充上月日期
     for (let i = firstDay - 1; i >= 0; i--) {
@@ -161,7 +144,7 @@ export default function Calendar({
   // 回到今天
   const handleGoToToday = () => {
     const today = new Date();
-    const todayStr = formatDate(today);
+    const todayStr = formatLocalDate(today);
     setCurrentMonth({ year: today.getFullYear(), month: today.getMonth() + 1 });
     onSelectDate(todayStr);
   };

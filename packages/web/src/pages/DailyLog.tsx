@@ -21,50 +21,19 @@ import {
   getDateRange,
   type SaveDayRecordParams,
 } from '../api';
-
-/**
- * 格式化日期为 YYYY-MM-DD
- */
-function formatDate(d: Date): string {
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * 获取本周一的日期
- */
-function getWeekStart(date: Date = new Date()): string {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return formatDate(d);
-}
-
-/**
- * 获取本周日的日期
- */
-function getWeekEnd(date: Date = new Date()): string {
-  const weekStart = new Date(date);
-  const day = weekStart.getDay();
-  const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
-  weekStart.setDate(diff + 6);
-  return formatDate(weekStart);
-}
+import { formatLocalDate, getWeekStart, getWeekEnd } from '@/lib/date-utils';
 
 export default function DailyLog() {
   const { date: urlDate } = useParams<{ date?: string }>();
   const navigate = useTransitionNavigate();
   
   // 初始化日期（优先使用 URL 参数）
-  const initialDate = useMemo(() => urlDate || formatDate(new Date()), []);
+  const initialDate = useMemo(() => urlDate || formatLocalDate(new Date()), []);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   
   // 导出日期范围（默认本周周一到周日）
   const [exportStartDate, setExportStartDate] = useState(() => getWeekStart());
-  const [exportEndDate, setExportEndDate] = useState(() => getWeekEnd());
+  const [exportEndDate, setExportEndDate] = useState(() => getWeekEnd(getWeekStart()));
   
   // 导出范围内的记录统计
   const [exportFilledDays, setExportFilledDays] = useState<number | undefined>(undefined);
@@ -170,7 +139,7 @@ export default function DailyLog() {
     const current = new Date(selectedDate);
     const newDate = new Date(current);
     newDate.setDate(current.getDate() + (direction === 'next' ? 1 : -1));
-    const newDateStr = formatDate(newDate);
+    const newDateStr = formatLocalDate(newDate);
     handleSelectDate(newDateStr);
   };
 

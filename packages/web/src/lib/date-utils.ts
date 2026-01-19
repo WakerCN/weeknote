@@ -9,7 +9,7 @@ const WEEKDAY_NAMES = ['周日', '周一', '周二', '周三', '周四', '周五
  * 将日期字符串解析为本地时间的 Date 对象
  * 避免 new Date('YYYY-MM-DD') 被解析为 UTC 时间导致的时区问题
  */
-function parseLocalDate(dateStr: string): Date {
+export function parseLocalDate(dateStr: string): Date {
   // 防御性检查：如果传入无效值，返回当前日期
   if (!dateStr || typeof dateStr !== 'string') {
     console.warn('[date-utils] parseLocalDate 收到无效参数:', dateStr);
@@ -22,7 +22,7 @@ function parseLocalDate(dateStr: string): Date {
 /**
  * 格式化 Date 对象为 YYYY-MM-DD 字符串（使用本地时区）
  */
-function formatLocalDate(d: Date): string {
+export function formatLocalDate(d: Date): string {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -32,8 +32,69 @@ function formatLocalDate(d: Date): string {
 /**
  * 将日期参数转换为本地时间的 Date 对象
  */
-function toLocalDate(date: Date | string): Date {
+export function toLocalDate(date: Date | string): Date {
   return typeof date === 'string' ? parseLocalDate(date) : date;
+}
+
+/**
+ * 获取上周一的日期
+ */
+export function getLastWeekStart(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  return getWeekStart(d);
+}
+
+/**
+ * 获取上周日的日期
+ */
+export function getLastWeekEnd(): string {
+  const lastWeekStart = parseLocalDate(getLastWeekStart());
+  lastWeekStart.setDate(lastWeekStart.getDate() + 6);
+  return formatLocalDate(lastWeekStart);
+}
+
+/**
+ * 获取本月1号的日期
+ */
+export function getMonthStart(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+/**
+ * 获取本月最后一天
+ */
+export function getMonthEnd(): string {
+  const d = new Date();
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return formatLocalDate(lastDay);
+}
+
+/**
+ * 获取N天前的日期
+ */
+export function getDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days + 1);
+  return formatLocalDate(d);
+}
+
+/**
+ * 计算日期范围内的天数
+ */
+export function getDayCount(startDate: string, endDate: string): number {
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
+  return Math.floor((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+}
+
+/**
+ * 格式化日期为短格式 M/D
+ */
+export function formatShortDate(dateStr: string): string {
+  const [, month, day] = dateStr.split('-');
+  return `${parseInt(month, 10)}/${parseInt(day, 10)}`;
 }
 
 /**
