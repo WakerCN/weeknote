@@ -4,6 +4,7 @@
  */
 
 import { useState, useRef, useMemo, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useRequest } from 'ahooks';
 import { useTransitionNavigate } from '../lib/navigation';
 import { toast } from 'sonner';
@@ -18,7 +19,7 @@ import {
   generateReportStream,
   getModels,
   getConfig,
-  exportWeek,
+  exportRange,
   type ModelInfo,
   type Platform,
   type ValidationWarning,
@@ -90,6 +91,7 @@ Notes
 
 export default function Home() {
   const navigate = useTransitionNavigate();
+  const location = useLocation();
   const [dailyLog, setDailyLog] = useState(SAMPLE_DAILY_LOG);
   const [report, setReport] = useState('');
   const [modelInfo, setModelInfo] = useState<{ id: string; name: string } | null>(null);
@@ -119,27 +121,53 @@ export default function Home() {
 
   // 检查是否有从每日记录页导入的数据
   useEffect(() => {
-    const state = (window.history.state as { dailyLog?: string }) || {};
-    if (state.dailyLog) {
+    const state = location.state as { 
+      dailyLog?: string;
+      dateRange?: { startDate: string; endDate: string };
+    } | null;
+    
+    if (state?.dailyLog) {
       setDailyLog(state.dailyLog);
+      // 显示导入成功提示（如果有日期范围信息）
+      if (state.dateRange) {
+        const { startDate, endDate } = state.dateRange;
+        toast.success(`已导入 ${startDate} 至 ${endDate} 的记录`);
+      }
       // 清除state，避免刷新时重复导入
-      window.history.replaceState({}, '');
+      navigate('/', { replace: true });
     }
-  }, []);
+  }, [location.state, navigate]);
 
-  // 导入本周记录
+  // 导入本周记录（快捷方式）
   const handleImportWeek = async () => {
     try {
-      const { text } = await exportWeek();
-      if (!text) {
+      // 计算本周日期范围
+      const today = new Date();
+      const day = today.getDay();
+      const diff = today.getDate() - day + (day === 0 ? -6 : 1);
+      const weekStart = new Date(today);
+      weekStart.setDate(diff);
+      
+      const formatDate = (d: Date) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const dayNum = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${dayNum}`;
+      };
+      
+      const startDate = formatDate(weekStart);
+      const endDate = formatDate(today);
+      
+      const result = await exportRange(startDate, endDate);
+      if (!result.text) {
         toast.warning('本周暂无记录');
         return;
       }
       if (dailyLog.trim() && !confirm('当前输入框有内容，是否覆盖？')) {
         return;
       }
-      setDailyLog(text);
-      toast.success('已导入本周记录');
+      setDailyLog(result.text);
+      toast.success(`已导入 ${result.filledDays} 天的记录`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导入失败');
     }

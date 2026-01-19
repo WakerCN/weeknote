@@ -1,5 +1,7 @@
 /**
  * 每日记录页面
+ * 
+ * 改版：使用日历视图替代周列表，支持任意日期范围导出
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -8,34 +10,64 @@ import { useRequest } from 'ahooks';
 import { toast } from 'sonner';
 import { Home as HomeIcon, Settings } from 'lucide-react';
 import { useTransitionNavigate } from '../lib/navigation';
-import WeekList from '../components/WeekList';
+import Calendar from '../components/Calendar';
 import DayEditor from '../components/DayEditor';
-import DatePicker from '../components/DatePicker';
+import DateRangePicker from '../components/DateRangePicker';
 import UserMenu from '../components/UserMenu';
 import {
-  getWeekSummaries,
-  getWeek,
   getDay,
   saveDay,
-  exportWeek,
-  getWeekStats,
-  type WeekSummary,
-  type DailyRecord,
+  exportRange,
+  getDateRange,
   type SaveDayRecordParams,
 } from '../api';
-import { getWeekStart, getWeekDates } from '../lib/date-utils';
+
+/**
+ * 格式化日期为 YYYY-MM-DD
+ */
+function formatDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * 获取本周一的日期
+ */
+function getWeekStart(date: Date = new Date()): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return formatDate(d);
+}
+
+/**
+ * 获取本周日的日期
+ */
+function getWeekEnd(date: Date = new Date()): string {
+  const weekStart = new Date(date);
+  const day = weekStart.getDay();
+  const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1);
+  weekStart.setDate(diff + 6);
+  return formatDate(weekStart);
+}
 
 export default function DailyLog() {
   const { date: urlDate } = useParams<{ date?: string }>();
   const navigate = useTransitionNavigate();
   
   // 初始化日期（优先使用 URL 参数）
-  const initialDate = useMemo(() => urlDate || new Date().toISOString().split('T')[0], []);
+  const initialDate = useMemo(() => urlDate || formatDate(new Date()), []);
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   
-  // 当前周的起始日期（用于控制周数据请求，只在周变化时更新）
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => getWeekStart(initialDate));
+  // 导出日期范围（默认本周周一到周日）
+  const [exportStartDate, setExportStartDate] = useState(() => getWeekStart());
+  const [exportEndDate, setExportEndDate] = useState(() => getWeekEnd());
+  
+  // 导出范围内的记录统计
+  const [exportFilledDays, setExportFilledDays] = useState<number | undefined>(undefined);
   
   // 仅在"切换日期"时展示右侧模糊遮罩
   const [isSwitchingDate, setIsSwitchingDate] = useState(false);
@@ -47,18 +79,7 @@ export default function DailyLog() {
   // 记录上一次处理的 URL 日期，避免重复处理
   const prevUrlDateRef = useRef<string | undefined>(urlDate);
 
-  // 加载周列表（只在初始化时加载一次）
-  const { data: weeksData, refresh: refreshWeeks } = useRequest(getWeekSummaries);
-
-  // 加载当前周数据 - 只在 currentWeekStart 变化时请求
-  const { data: weekData, refresh: refreshWeek } = useRequest(
-    () => getWeek(currentWeekStart),
-    {
-      refreshDeps: [currentWeekStart],
-    }
-  );
-
-  // 加载当前日期记录 - 每次日期变化都请求
+  // 加载当前日期记录
   const { data: currentRecord, refresh: refreshRecord, loading: recordLoading } = useRequest(
     () => getDay(selectedDate),
     {
@@ -66,15 +87,26 @@ export default function DailyLog() {
     }
   );
 
-  // 加载统计信息 - 只在周变化时请求
-  const { data: stats } = useRequest(
-    () => getWeekStats(currentWeekStart),
+  // 加载导出范围内的统计
+  const { run: loadExportStats } = useRequest(
+    async () => {
+      const result = await getDateRange(exportStartDate, exportEndDate);
+      return result;
+    },
     {
-      refreshDeps: [currentWeekStart],
+      manual: true,
+      onSuccess: (result) => {
+        setExportFilledDays(result?.stats?.filled ?? 0);
+      },
     }
   );
 
-  // 当 URL 参数变化时更新选中日期（仅处理真正的变化）
+  // 导出范围变化时重新加载统计
+  useEffect(() => {
+    loadExportStats();
+  }, [exportStartDate, exportEndDate]);
+
+  // 当 URL 参数变化时更新选中日期
   useEffect(() => {
     if (urlDate && urlDate !== prevUrlDateRef.current) {
       prevUrlDateRef.current = urlDate;
@@ -83,15 +115,9 @@ export default function DailyLog() {
         setIsSwitchingDate(true);
         dateSwitchRef.current = { target: urlDate, sawLoading: false };
         setSelectedDate(urlDate);
-        
-        // 检查是否需要切换周
-        const newWeekStart = getWeekStart(urlDate);
-        if (newWeekStart !== currentWeekStart) {
-          setCurrentWeekStart(newWeekStart);
-        }
       }
     }
-  }, [urlDate, selectedDate, currentWeekStart]);
+  }, [urlDate, selectedDate]);
 
   // 监听 recordLoading：只有"因切换日期"触发的加载才会驱动 isSwitchingDate 结束
   useEffect(() => {
@@ -117,9 +143,11 @@ export default function DailyLog() {
       await saveDay(date, params);
       if (date === selectedDate) {
         await refreshRecord();
-        await refreshWeek();
       }
-      await refreshWeeks();
+      // 如果保存的日期在导出范围内，刷新统计
+      if (date >= exportStartDate && date <= exportEndDate) {
+        loadExportStats();
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '保存失败');
       throw error;
@@ -134,12 +162,6 @@ export default function DailyLog() {
     dateSwitchRef.current = { target: date, sawLoading: false };
     setSelectedDate(date);
     
-    // 检查是否需要切换周
-    const newWeekStart = getWeekStart(date);
-    if (newWeekStart !== currentWeekStart) {
-      setCurrentWeekStart(newWeekStart);
-    }
-    
     navigate(`/daily/${date}`, { replace: true });
   };
 
@@ -148,85 +170,39 @@ export default function DailyLog() {
     const current = new Date(selectedDate);
     const newDate = new Date(current);
     newDate.setDate(current.getDate() + (direction === 'next' ? 1 : -1));
-    const newDateStr = newDate.toISOString().split('T')[0];
+    const newDateStr = formatDate(newDate);
     handleSelectDate(newDateStr);
   };
 
-  // 补录日期
-  const handleBackfill = () => {
-    setShowDatePicker(true);
-  };
-
-  // 日期选择器回调
-  const handleDateSelect = (date: string) => {
-    handleSelectDate(date);
+  // 日期范围变化
+  const handleRangeChange = (start: string, end: string) => {
+    setExportStartDate(start);
+    setExportEndDate(end);
   };
 
   // 导入到首页
   const handleImportToHome = async () => {
     try {
-      const { text } = await exportWeek(selectedDate);
-      if (!text) {
-        toast.warning('本周暂无记录');
+      const result = await exportRange(exportStartDate, exportEndDate);
+      if (!result.text) {
+        toast.warning('所选时间段暂无记录');
         return;
       }
-      navigate('/', { state: { dailyLog: text }, scope: 'root' });
+      navigate('/', { 
+        state: { 
+          dailyLog: result.text,
+          dateRange: { startDate: exportStartDate, endDate: exportEndDate }
+        }, 
+        scope: 'root' 
+      });
       toast.success('已导入到首页');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导出失败');
     }
   };
 
-  const weeks: WeekSummary[] = weeksData?.weeks || [];
-  const records: Record<string, DailyRecord> = weekData?.days || {};
   const safeCurrentRecord =
     currentRecord && currentRecord.date === selectedDate ? currentRecord : null;
-
-  // 今天所在的周
-  const todayWeekStart = getWeekStart();
-
-  // 确保"今天所在的周"和"当前选中的周"都在列表中
-  const allWeeks = [...weeks];
-  
-  // 添加今天所在的周（如果不存在）
-  const todayWeekExists = allWeeks.some((w) => w.weekStart === todayWeekStart);
-  if (!todayWeekExists) {
-    const weekDates = getWeekDates(todayWeekStart);
-    const weekEnd = weekDates[weekDates.length - 1].date;
-    allWeeks.unshift({
-      fileName: '',
-      year: new Date(todayWeekStart).getFullYear(),
-      week: 0,
-      weekStart: todayWeekStart,
-      weekEnd,
-      filledDays: 0,
-      lastUpdated: new Date().toISOString(),
-    });
-  }
-
-  // 添加当前选中的周（如果不存在且与今天不同）
-  if (currentWeekStart !== todayWeekStart) {
-    const currentWeekExists = allWeeks.some((w) => w.weekStart === currentWeekStart);
-    if (!currentWeekExists) {
-      const weekDates = getWeekDates(currentWeekStart);
-      const weekEnd = weekDates[weekDates.length - 1].date;
-      const insertIndex = allWeeks.findIndex((w) => w.weekStart < currentWeekStart);
-      const newWeek = {
-        fileName: '',
-        year: new Date(currentWeekStart).getFullYear(),
-        week: 0,
-        weekStart: currentWeekStart,
-        weekEnd,
-        filledDays: 0,
-        lastUpdated: new Date().toISOString(),
-      };
-      if (insertIndex === -1) {
-        allWeeks.push(newWeek);
-      } else {
-        allWeeks.splice(insertIndex, 0, newWeek);
-      }
-    }
-  }
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#0d1117]">
@@ -260,16 +236,11 @@ export default function DailyLog() {
 
       {/* 主内容区 */}
       <main className="flex-1 flex overflow-hidden">
-        {/* 左侧：周列表 */}
-        <div className="w-64 flex-shrink-0">
-          <WeekList
-            weeks={allWeeks}
+        {/* 左侧：日历 */}
+        <div className="w-72 flex-shrink-0">
+          <Calendar
             selectedDate={selectedDate}
             onSelectDate={handleSelectDate}
-            weekData={records}
-            currentWeekStart={currentWeekStart}
-            onBackfill={handleBackfill}
-            onRefresh={refreshWeeks}
           />
         </div>
 
@@ -287,34 +258,19 @@ export default function DailyLog() {
 
       {/* 底部操作栏 */}
       <div className="h-16 flex items-center justify-between px-6 bg-[#161b22] border-t border-[#30363d]">
-        <div className="text-sm text-[#8b949e]">
-          {stats && (
-            <>
-              本周已记录 {stats.weekdaysFilled}/5 个工作日
-              {stats.filledDays > stats.weekdaysFilled && (
-                <span className="ml-2 text-[#484f58]">
-                  （含周末 {stats.filledDays - stats.weekdaysFilled} 天）
-                </span>
-              )}
-            </>
-          )}
-        </div>
+        <DateRangePicker
+          startDate={exportStartDate}
+          endDate={exportEndDate}
+          onChange={handleRangeChange}
+          filledDays={exportFilledDays}
+        />
         <button
           onClick={handleImportToHome}
           className="px-6 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-white hover:from-emerald-400 hover:to-cyan-400 transition-all font-medium text-sm"
         >
-          🚀 导入本周到首页生成周报
+          🚀 导入到首页生成周报
         </button>
       </div>
-
-      {/* 日期选择器 */}
-      {showDatePicker && (
-        <DatePicker
-          value={selectedDate}
-          onSelect={handleDateSelect}
-          onClose={() => setShowDatePicker(false)}
-        />
-      )}
     </div>
   );
 }
