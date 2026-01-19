@@ -2,6 +2,24 @@
 
 # WeekNote 云端版本快速启动脚本
 
+# 加载 nvm 并使用项目指定的 Node 版本
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+# 如果存在 .nvmrc，自动切换到对应版本
+if [ -f ".nvmrc" ]; then
+  nvm use
+fi
+
+# 确保使用 nvm 管理的 Node，移除 Homebrew Node 的干扰
+export PATH="$NVM_DIR/versions/node/$(node -v)/bin:$PATH"
+
+# 使用淘宝镜像源加速 corepack 下载
+export COREPACK_NPM_REGISTRY=https://registry.npmmirror.com
+
+# 启用 corepack
+corepack enable 2>/dev/null || true
+
 echo "============================================================"
 echo "  WeekNote 云端版本启动脚本"
 echo "============================================================"
