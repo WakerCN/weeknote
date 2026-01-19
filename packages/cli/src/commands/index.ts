@@ -15,4 +15,3 @@ export {
   type ConfigKeyOptions,
   type ConfigEndpointOptions,
 } from './config.js';
-export { runServe } from './serve.js';
