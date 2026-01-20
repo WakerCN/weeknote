@@ -7,6 +7,7 @@ import { body, param, query } from 'express-validator';
 import mongoose from 'mongoose';
 import { PromptTemplate } from '../db/models/PromptTemplate.js';
 import { authMiddleware, optionalAuthMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
+import { DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT_TEMPLATE } from '@weeknote/core';
 
 const router: Router = Router();
 
@@ -19,9 +20,18 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
     const userId = new mongoose.Types.ObjectId(req.user!.userId);
     const templates = await PromptTemplate.findByUser(userId);
 
+    // 找到当前激活的模板 ID
+    const activeTemplate = templates.find((t: { isActive: boolean }) => t.isActive);
+    const activeTemplateId = activeTemplate?.id || null;
+
     res.json({
       success: true,
+      activeTemplateId,
       templates,
+      defaults: {
+        systemPrompt: DEFAULT_SYSTEM_PROMPT,
+        userPromptTemplate: DEFAULT_USER_PROMPT_TEMPLATE,
+      },
     });
   } catch (error) {
     console.error('[Prompt] 获取模板列表失败:', error);

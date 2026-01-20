@@ -71,11 +71,11 @@ export default function PromptPanel({ open, onClose, dailyLog }: PromptPanelProp
   );
 
   // 系统提示词
-  const systemPrompt = activeTemplate?.systemPrompt || promptsData?.defaults.systemPrompt || '';
+  const systemPrompt = activeTemplate?.systemPrompt || promptsData?.defaults?.systemPrompt || '';
 
   // 用户提示词（替换占位符）
   const userPromptTemplate =
-    activeTemplate?.userPromptTemplate || promptsData?.defaults.userPromptTemplate || '';
+    activeTemplate?.userPromptTemplate || promptsData?.defaults?.userPromptTemplate || '';
   const userPrompt = userPromptTemplate.replace(/\{\{dailyLog\}\}/g, dailyLog || '（Daily Log 为空）');
 
   // 复制功能
