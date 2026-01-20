@@ -8,9 +8,7 @@
   },
   "scripts": {
     "dev": "tsc --watch",
-    "dev:server": "node --watch-path=dist --watch-path=../core/dist dist/index.js serve --no-open",
-    "build": "tsc && pnpm build:web",
-    "build:web": "cd ../web && pnpm build",
+    "build": "tsc",
     "lint": "eslint src/",
     "start": "node dist/index.js"
   },
@@ -55,7 +53,6 @@
     "typescript": "^5.6.0"
   },
   "files": [
-    "dist",
-    "web-dist"
+    "dist"
   ]
 }
