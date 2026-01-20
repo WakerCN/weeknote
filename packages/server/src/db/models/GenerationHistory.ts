@@ -12,22 +12,24 @@ export interface IGenerationHistory extends Document {
   _id: mongoose.Types.ObjectId;
   userId: mongoose.Types.ObjectId;
 
-  // 输入信息
-  weekStart: string;           // 周开始日期 "2024-12-16"
-  weekEnd: string;             // 周结束日期 "2024-12-22"
-  inputText: string;           // 输入的 Daily Log 原文
+  // 日期范围信息
+  dateStart?: string;        // 日期范围开始，YYYY-MM-DD 格式（导入时有值）
+  dateEnd?: string;          // 日期范围结束，YYYY-MM-DD 格式（导入时有值）
+  dateRangeLabel: string;    // 展示用标签，如 "01-13 ~ 01-17" 或 "手动输入"
 
-  // 输出信息
-  outputMarkdown: string;      // 生成的周报 Markdown
+  // 内容
+  inputText: string;         // 输入的 Daily Log 原文
+  outputMarkdown: string;    // 生成的周报 Markdown
 
   // 生成配置
-  modelId: string;             // 使用的模型 ID
-  modelName: string;           // 模型名称
+  modelId: string;           // 使用的模型 ID
+  modelName: string;         // 模型名称
   promptTemplateId?: mongoose.Types.ObjectId;  // 使用的 Prompt 模板
   promptTemplateName?: string; // 模板名称
 
   // 时间信息
-  generatedAt: Date;           // 生成时间
+  generatedAt: Date;         // 开始生成时间
+  completedAt: Date;         // 生成完成时间
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,9 +42,9 @@ export interface IGenerationHistoryModel extends Model<IGenerationHistory> {
     userId: mongoose.Types.ObjectId,
     options?: { limit?: number; skip?: number }
   ): Promise<IGenerationHistory[]>;
-  findByUserAndWeek(
+  findByUserAndDateRange(
     userId: mongoose.Types.ObjectId,
-    weekStart: string
+    dateStart: string
   ): Promise<IGenerationHistory[]>;
 }
 
@@ -57,15 +59,19 @@ const GenerationHistorySchema = new Schema<IGenerationHistory, IGenerationHistor
       required: [true, '用户ID不能为空'],
       index: true,
     },
-    weekStart: {
+    // 日期范围（可选，导入时有值）
+    dateStart: {
       type: String,
-      required: [true, '周开始日期不能为空'],
       match: [/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD'],
     },
-    weekEnd: {
+    dateEnd: {
       type: String,
-      required: [true, '周结束日期不能为空'],
       match: [/^\d{4}-\d{2}-\d{2}$/, '日期格式应为 YYYY-MM-DD'],
+    },
+    // 展示用标签（必填）
+    dateRangeLabel: {
+      type: String,
+      required: [true, '日期范围标签不能为空'],
     },
     inputText: {
       type: String,
@@ -95,6 +101,11 @@ const GenerationHistorySchema = new Schema<IGenerationHistory, IGenerationHistor
       required: true,
       default: Date.now,
     },
+    completedAt: {
+      type: Date,
+      required: true,
+      default: Date.now,
+    },
   },
   {
     timestamps: true,
@@ -102,14 +113,14 @@ const GenerationHistorySchema = new Schema<IGenerationHistory, IGenerationHistor
 );
 
 /**
- * 索引：按用户和生成时间倒序查询
+ * 索引：按用户和完成时间倒序查询
  */
-GenerationHistorySchema.index({ userId: 1, generatedAt: -1 });
+GenerationHistorySchema.index({ userId: 1, completedAt: -1 });
 
 /**
- * 索引：按用户和周查询
+ * 索引：按用户和日期范围查询
  */
-GenerationHistorySchema.index({ userId: 1, weekStart: 1 });
+GenerationHistorySchema.index({ userId: 1, dateStart: 1 });
 
 /**
  * 静态方法：查询用户的生成历史（分页）
@@ -120,19 +131,19 @@ GenerationHistorySchema.statics.findByUser = function (
 ): Promise<IGenerationHistory[]> {
   const { limit = 20, skip = 0 } = options;
   return this.find({ userId })
-    .sort({ generatedAt: -1 })
+    .sort({ completedAt: -1 })
     .skip(skip)
     .limit(limit);
 };
 
 /**
- * 静态方法：查询用户某周的生成历史
+ * 静态方法：查询用户某日期范围的生成历史
  */
-GenerationHistorySchema.statics.findByUserAndWeek = function (
+GenerationHistorySchema.statics.findByUserAndDateRange = function (
   userId: mongoose.Types.ObjectId,
-  weekStart: string
+  dateStart: string
 ): Promise<IGenerationHistory[]> {
-  return this.find({ userId, weekStart }).sort({ generatedAt: -1 });
+  return this.find({ userId, dateStart }).sort({ completedAt: -1 });
 };
 
 /**
