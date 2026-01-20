@@ -4,13 +4,13 @@
  */
 
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 import { useRequest } from 'ahooks';
 import { useTransitionNavigate } from '../lib/navigation';
 import { toast } from 'sonner';
 import { FileText, Calendar, StopCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import SyncScrollEditor from '../components/SyncScrollEditor';
 import PromptPanel from '../components/PromptPanel';
+import HistorySidebar, { type HistorySidebarRef, type GeneratingItem } from '../components/HistorySidebar';
 import UserMenu from '../components/UserMenu';
 import VolcengineLogo from '../assets/logos/volcengine.svg';
 import DeepSeekLogo from '../assets/logos/deepseek.svg';
@@ -24,8 +24,11 @@ import {
   type Platform,
   type ValidationWarning,
   type ThinkingMode,
+  type GenerationHistoryItem,
+  type DateRange,
 } from '../api';
 import { Combobox, type ComboboxOption, type ComboboxTag } from '@/components/ui/combobox';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 // 示例 Daily Log
 const SAMPLE_DAILY_LOG = `12-15 | 周一
@@ -91,13 +94,24 @@ Notes
 
 export default function Home() {
   const navigate = useTransitionNavigate();
-  const location = useLocation();
   const [dailyLog, setDailyLog] = useState(SAMPLE_DAILY_LOG);
   const [report, setReport] = useState('');
   const [modelInfo, setModelInfo] = useState<{ id: string; name: string } | null>(null);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [showPromptPanel, setShowPromptPanel] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  
+  // 历史侧边栏状态
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [currentHistoryId, setCurrentHistoryId] = useState<string | undefined>(undefined);
+  const historySidebarRef = useRef<HistorySidebarRef>(null);
+  const [generatingItem, setGeneratingItem] = useState<GeneratingItem | null>(null);
+  
+  // 日期范围状态（导入时有值，手动编辑后清除）
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  
+  // 确认弹框
+  const { confirm, ConfirmDialogComponent } = useConfirm();
   
   // 推理模式相关状态
   const [thinkingMode, setThinkingMode] = useState<ThinkingMode>('enabled');
@@ -119,24 +133,38 @@ export default function Home() {
     }
   }, [thinkingContent, isThinking]);
 
-  // 检查是否有从每日记录页导入的数据
+  // 检查是否有从每日记录页导入的数据（使用 sessionStorage 传递一次性数据）
   useEffect(() => {
-    const state = location.state as { 
-      dailyLog?: string;
-      dateRange?: { startDate: string; endDate: string };
-    } | null;
+    const importDataStr = sessionStorage.getItem('weeknote_import');
+    if (!importDataStr) return;
     
-    if (state?.dailyLog) {
-      setDailyLog(state.dailyLog);
-      // 显示导入成功提示（如果有日期范围信息）
-      if (state.dateRange) {
-        const { startDate, endDate } = state.dateRange;
-        toast.success(`已导入 ${startDate} 至 ${endDate} 的记录`);
+    // 立即清除，确保只处理一次
+    sessionStorage.removeItem('weeknote_import');
+    
+    try {
+      const importData = JSON.parse(importDataStr) as {
+        dailyLog: string;
+        dateRange?: { startDate: string; endDate: string };
+        filledDays?: number;
+      };
+      
+      if (importData.dailyLog) {
+        setDailyLog(importData.dailyLog);
+        // 设置日期范围（用于保存历史）
+        if (importData.dateRange) {
+          setDateRange({
+            startDate: importData.dateRange.startDate,
+            endDate: importData.dateRange.endDate,
+          });
+          const { startDate, endDate } = importData.dateRange;
+          const filledInfo = importData.filledDays ? `（${importData.filledDays} 天有记录）` : '';
+          toast.success(`已导入 ${startDate} 至 ${endDate} 的记录${filledInfo}`);
+        }
       }
-      // 清除state，避免刷新时重复导入
-      navigate('/', { replace: true });
+    } catch {
+      // JSON 解析失败，忽略
     }
-  }, [location.state, navigate]);
+  }, []); // 空依赖，只在组件挂载时执行一次
 
   // 导入本周记录（快捷方式）
   const handleImportWeek = async () => {
@@ -163,10 +191,19 @@ export default function Home() {
         toast.warning('本周暂无记录');
         return;
       }
-      if (dailyLog.trim() && !confirm('当前输入框有内容，是否覆盖？')) {
-        return;
+      // 如果当前有内容，弹出确认框
+      if (dailyLog.trim()) {
+        const confirmed = await confirm({
+          title: '覆盖当前内容',
+          description: '当前输入框已有内容，导入本周记录将覆盖现有内容。确定要继续吗？',
+          confirmText: '确认导入',
+          cancelText: '取消',
+        });
+        if (!confirmed) return;
       }
       setDailyLog(result.text);
+      // 设置日期范围（用于保存历史）
+      setDateRange({ startDate, endDate });
       toast.success(`已导入 ${result.filledDays} 天的记录`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导入失败');
@@ -321,6 +358,16 @@ export default function Home() {
       setModelInfo(null);
       setThinkingContent('');
       
+      // 获取当前模型名称
+      const currentModel = modelsData?.models?.find((m: ModelInfo) => m.id === selectedModelId);
+      const modelName = currentModel?.name || selectedModelId || '未知模型';
+      
+      // 设置正在生成的临时项（显示在历史列表顶部）
+      const dateRangeLabel = dateRange 
+        ? `${dateRange.startDate.slice(5)} ~ ${dateRange.endDate.slice(5)}`
+        : '手动输入';
+      setGeneratingItem({ dateRangeLabel, modelName });
+      
       // DeepSeek R1 不支持禁用思考，始终为 enabled
       const isDeepSeekR1 = selectedModelId === 'deepseek/deepseek-reasoner';
       const effectiveThinkingMode = isDeepSeekR1 ? 'enabled' : thinkingMode;
@@ -340,11 +387,16 @@ export default function Home() {
         signal: abortControllerRef.current.signal,
         modelId: selectedModelId || undefined,
         thinkingMode: isReasoningModel ? effectiveThinkingMode : undefined,
+        dateRange: dateRange || undefined,
       });
 
       setIsThinking(false);
       setModelInfo(result.model);
       abortControllerRef.current = null;
+
+      // 清除正在生成的临时项并刷新历史列表
+      setGeneratingItem(null);
+      historySidebarRef.current?.refresh();
 
       // 显示格式警告（如果有）
       if (result.warnings?.length) {
@@ -357,6 +409,7 @@ export default function Home() {
       manual: true,
       onError: (err) => {
         setIsThinking(false);
+        setGeneratingItem(null); // 清除正在生成的临时项
         // AbortError 不显示错误
         if (err.name === 'AbortError') return;
         toast.error(err.message || '生成失败');
@@ -385,11 +438,63 @@ export default function Home() {
     // 关闭思考区域
     setIsThinking(false);
     setThinkingContent('');
+    // 清除正在生成的临时项
+    setGeneratingItem(null);
+  };
+
+  // 处理 Daily Log 编辑（带确认逻辑）
+  const handleDailyLogChange = async (newValue: string) => {
+    // 如果有日期范围（导入的内容）且内容发生变化，弹出确认框
+    if (dateRange && newValue !== dailyLog) {
+      const confirmed = await confirm({
+        title: '确认编辑',
+        description: `当前内容来自「${dateRange.startDate} ~ ${dateRange.endDate}」的每日记录导入。\n\n手动编辑后：\n• 日期范围信息将被清除\n• 生成历史将显示为「手动输入」\n\n建议通过「每日记录」页面修改原始数据后重新导入。`,
+        confirmText: '继续编辑',
+        cancelText: '取消',
+      });
+      if (!confirmed) return;
+      // 清除日期范围
+      setDateRange(null);
+    }
+    setDailyLog(newValue);
+  };
+
+  // 从历史记录加载
+  const handleLoadHistory = async (history: GenerationHistoryItem) => {
+    // 如果正在生成，提示用户
+    if (isGenerating) {
+      toast.warning('请等待当前生成完成');
+      return;
+    }
+    
+    // 如果当前有未保存的内容，询问用户
+    if ((dailyLog.trim() && dailyLog !== SAMPLE_DAILY_LOG) || report.trim()) {
+      const confirmed = await confirm({
+        title: '加载历史记录',
+        description: '加载历史记录将覆盖当前的 Daily Log 和周报内容。确定要继续吗？',
+        confirmText: '确认加载',
+        cancelText: '取消',
+      });
+      if (!confirmed) return;
+    }
+    
+    setDailyLog(history.inputText);
+    setReport(history.outputMarkdown);
+    setCurrentHistoryId(history._id);
+    setModelInfo({ id: history.modelId, name: history.modelName });
+    // 如果历史有日期范围，恢复
+    if (history.dateStart && history.dateEnd) {
+      setDateRange({ startDate: history.dateStart, endDate: history.dateEnd });
+    } else {
+      setDateRange(null);
+    }
+    
+    toast.success(`已加载「${history.dateRangeLabel}」的周报`);
   };
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#0d1117]">
-      {/* 顶部导航栏 */}
+      {/* 顶部导航栏 - 全宽 */}
       <header className="h-14 flex items-center justify-between px-6 bg-[#161b22] border-b border-[#30363d]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center text-white font-bold text-sm">
@@ -431,24 +536,45 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 主内容区 */}
-      <main className="flex-1 flex flex-col p-4 gap-3 overflow-hidden">
+      {/* 主体区域：侧边栏（贴边）+ 主内容（限宽居中） */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* 左侧：历史记录侧边栏 - 贴在屏幕最左边 */}
+        <HistorySidebar
+          ref={historySidebarRef}
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
+          onSelectHistory={handleLoadHistory}
+          selectedId={currentHistoryId}
+          generatingItem={generatingItem}
+        />
+
+        {/* 右侧：主内容区 - 限制最大宽度并居中 */}
+        <div className="flex-1 flex justify-center overflow-hidden">
+          <main className="w-full max-w-[1200px] flex flex-col p-4 gap-3 overflow-hidden">
         {/* 上半区：Daily Log 输入 */}
         <SyncScrollEditor
           value={dailyLog}
-          onChange={setDailyLog}
+          onChange={handleDailyLogChange}
           title="Daily Log"
           titleIcon="📝"
           previewTitle="预览"
           previewIcon="👁️"
           headerRight={
-            <button
-              onClick={handleImportWeek}
-              className="px-3 py-1 rounded text-xs font-medium bg-[#21262d] text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#30363d] transition-colors"
-              title="从每日记录导入本周日志"
-            >
-              📥 导入本周
-            </button>
+            <div className="flex items-center gap-2">
+              {/* 日期范围标识 */}
+              {dateRange && (
+                <span className="px-2 py-1 rounded text-xs font-medium bg-emerald-500/20 text-emerald-400">
+                  📅 {dateRange.startDate.slice(5)} ~ {dateRange.endDate.slice(5)}
+                </span>
+              )}
+              <button
+                onClick={handleImportWeek}
+                className="px-3 py-1 rounded text-xs font-medium bg-[#21262d] text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#30363d] transition-colors"
+                title="从每日记录导入本周日志"
+              >
+                📥 导入本周
+              </button>
+            </div>
           }
         />
 
@@ -659,10 +785,15 @@ export default function Home() {
             </button>
           }
         />
-      </main>
+          </main>
+        </div>
+      </div>
 
       {/* Prompt 预览侧边面板 */}
       <PromptPanel open={showPromptPanel} onClose={() => setShowPromptPanel(false)} dailyLog={dailyLog} />
+      
+      {/* 确认弹框 */}
+      <ConfirmDialogComponent />
     </div>
   );
 }
