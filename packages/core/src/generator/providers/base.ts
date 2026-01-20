@@ -7,7 +7,7 @@ import OpenAI from 'openai';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import type { RequestInit } from 'node-fetch';
 import nodeFetch from 'node-fetch';
-import type { ChatMessage, LLMProvider, ModelConfig, ModelId, StreamCallbacks } from '../types.js';
+import type { ChatMessage, LLMProvider, ModelConfig, ModelId, StreamCallbacks, StreamOptions } from '../types.js';
 import { GeneratorError, MODEL_REGISTRY } from '../types.js';
 
 /**
@@ -213,11 +213,13 @@ export class OpenAICompatibleProvider implements LLMProvider {
   async generateStream(
     messages: ChatMessage[],
     config: ModelConfig,
-    callbacks: StreamCallbacks | ((chunk: string) => void)
+    callbacks: StreamCallbacks | ((chunk: string) => void),
+    options?: StreamOptions
   ): Promise<string> {
     const client = this.createClient(config);
     const meta = this.getModelMeta();
     const actualModel = this.getActualModel(config);
+    const signal = options?.signal;
 
     // 兼容旧的函数回调方式
     const { onChunk, onThinking } = typeof callbacks === 'function' 
@@ -225,6 +227,11 @@ export class OpenAICompatibleProvider implements LLMProvider {
       : callbacks;
 
     try {
+      // 在开始前检查是否已中止
+      if (signal?.aborted) {
+        throw new GeneratorError('UNKNOWN', '请求已取消', this.modelId);
+      }
+
       // 构建额外的请求参数
       // 注意：豆包 Seed 需要 thinking 参数来控制思考模式，只支持 enabled 和 disabled
       // DeepSeek R1 不需要额外参数，会自动返回 reasoning_content
@@ -248,6 +255,16 @@ export class OpenAICompatibleProvider implements LLMProvider {
       let fullThinking = '';
 
       for await (const chunk of stream) {
+        // 在每个 chunk 处理前检查是否已中止
+        if (signal?.aborted) {
+          console.log(`[Provider] 流式生成被中止: ${this.modelId}`);
+          // 尝试中止底层流
+          if ('controller' in stream && typeof (stream as any).controller?.abort === 'function') {
+            (stream as any).controller.abort();
+          }
+          throw new GeneratorError('UNKNOWN', '请求已取消', this.modelId);
+        }
+
         const delta = chunk.choices[0]?.delta;
         if (!delta) continue;
 

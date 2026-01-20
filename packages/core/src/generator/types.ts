@@ -240,6 +240,14 @@ export interface ChatMessage {
 }
 
 /**
+ * 流式生成选项
+ */
+export interface StreamOptions {
+  /** 中止信号（用于取消流式生成） */
+  signal?: AbortSignal;
+}
+
+/**
  * LLM Provider 接口
  */
 export interface LLMProvider {
@@ -251,7 +259,8 @@ export interface LLMProvider {
   generateStream(
     messages: ChatMessage[],
     config: ModelConfig,
-    callbacks: StreamCallbacks | ((chunk: string) => void)
+    callbacks: StreamCallbacks | ((chunk: string) => void),
+    options?: StreamOptions
   ): Promise<string>;
 }
 

@@ -127,6 +127,8 @@ function extractIssues(
 export interface GenerateOptions {
   /** 自定义 Prompt 模板 */
   customTemplate?: CustomPromptTemplate;
+  /** 中止信号（用于取消流式生成） */
+  signal?: AbortSignal;
 }
 
 /**
@@ -169,7 +171,11 @@ export async function generateReportStream(
     primary: config.primary,
   });
 
-  const { content, modelId } = await manager.generateStream(messages, callbacks);
+  const { content, modelId } = await manager.generateStream(
+    messages,
+    callbacks,
+    { signal: options?.signal }
+  );
   const report = parseReportFromMarkdown(content);
   const modelMeta = MODEL_REGISTRY[modelId];
 

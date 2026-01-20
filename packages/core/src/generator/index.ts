@@ -14,6 +14,7 @@ export type {
   LLMProvider,
   ThinkingMode,
   StreamCallbacks,
+  StreamOptions,
 } from './types.js';
 
 export {
