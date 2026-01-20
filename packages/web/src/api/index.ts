@@ -209,6 +209,14 @@ export interface StreamCallbacks {
 }
 
 /**
+ * 日期范围（用于历史记录）
+ */
+export interface DateRange {
+  startDate: string;  // YYYY-MM-DD
+  endDate: string;    // YYYY-MM-DD
+}
+
+/**
  * 流式生成选项
  */
 export interface GenerateStreamOptions {
@@ -220,6 +228,8 @@ export interface GenerateStreamOptions {
   thinkingMode?: ThinkingMode;
   /** 超时时间（毫秒），默认 180000（3分钟） */
   timeout?: number;
+  /** 日期范围（可选，导入时有值） */
+  dateRange?: DateRange;
 }
 
 /** 默认超时时间：3分钟（推理模型可能需要较长时间） */
@@ -263,6 +273,7 @@ export async function generateReportStream(
   let selectedModelId: string | undefined;
   let thinkingMode: ThinkingMode | undefined;
   let timeout: number = DEFAULT_STREAM_TIMEOUT;
+  let dateRange: DateRange | undefined;
 
   if (typeof dailyLogOrOptions === 'string') {
     // 旧的调用方式
@@ -278,6 +289,7 @@ export async function generateReportStream(
     selectedModelId = dailyLogOrOptions.modelId;
     thinkingMode = dailyLogOrOptions.thinkingMode;
     timeout = dailyLogOrOptions.timeout ?? DEFAULT_STREAM_TIMEOUT;
+    dateRange = dailyLogOrOptions.dateRange;
   }
 
   // 创建超时控制器
@@ -315,6 +327,7 @@ export async function generateReportStream(
         dailyLog, 
         modelId: selectedModelId,
         ...(thinkingMode ? { thinkingMode } : {}),
+        ...(dateRange ? { dateRange } : {}),
       }),
       signal: combinedSignal,
     });
@@ -616,6 +629,48 @@ export const testDingtalk = (webhook: string, secret?: string) =>
   apiClient
     .post('/reminder/test/dingtalk', { webhook, secret })
     .then(extractData);
+
+// ========== 生成历史 API ==========
+
+/** 生成历史记录类型 */
+export interface GenerationHistoryItem {
+  _id: string;
+  dateStart?: string;       // 日期范围开始 "2024-12-16"（导入时有值）
+  dateEnd?: string;         // 日期范围结束 "2024-12-22"（导入时有值）
+  dateRangeLabel: string;   // 展示用标签 "12-16 ~ 12-22" 或 "手动输入"
+  inputText: string;        // 输入的 Daily Log
+  outputMarkdown: string;   // 生成的周报
+  modelId: string;
+  modelName: string;
+  promptTemplateName?: string;
+  generatedAt: string;      // 开始生成时间 ISO
+  completedAt: string;      // 生成完成时间 ISO
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 历史列表分页响应 */
+export interface HistoryListResponse {
+  histories: GenerationHistoryItem[];
+  pagination: {
+    total: number;
+    limit: number;
+    skip: number;
+    hasMore: boolean;
+  };
+}
+
+/** 获取历史列表 */
+export const getHistoryList = (limit = 20, skip = 0): Promise<HistoryListResponse> =>
+  apiClient.get('/history', { params: { limit, skip } }).then(extractData);
+
+/** 获取历史详情 */
+export const getHistoryDetail = (id: string): Promise<{ history: GenerationHistoryItem }> =>
+  apiClient.get(`/history/${id}`).then(extractData);
+
+/** 删除历史记录 */
+export const deleteHistory = (id: string) =>
+  apiClient.delete(`/history/${id}`).then(extractData);
 
 export default apiClient;
 
