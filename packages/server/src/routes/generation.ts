@@ -173,10 +173,12 @@ router.post(
       });
 
       // 保存生成历史
+      const completedAt = new Date();
       const history = await GenerationHistory.create({
         userId,
-        weekStart: startDate,
-        weekEnd: endDate,
+        dateStart: startDate,
+        dateEnd: endDate,
+        dateRangeLabel: `${startDate.slice(5)} ~ ${endDate.slice(5)}`,
         inputText,
         outputMarkdown: result.report.rawMarkdown,
         modelId: result.modelId,
@@ -184,6 +186,7 @@ router.post(
         promptTemplateId: usedTemplateId,
         promptTemplateName: usedTemplateName,
         generatedAt: new Date(),
+        completedAt,
       });
 
       console.log(`[Generate] 生成周报: ${req.user!.email} - ${startDate} ~ ${endDate} - ${result.modelId}`);
@@ -222,9 +225,27 @@ function getPlatformFromModelId(modelId: string): 'siliconflow' | 'deepseek' | '
  * 生成周报（流式）
  */
 router.post('/stream', async (req: AuthRequest, res: Response) => {
+  // 记录开始生成时间
+  const generatedAt = new Date();
+  
+  // 创建 AbortController 用于取消流式生成
+  const abortController = new AbortController();
+  let isAborted = false;
+  let isGenerating = false; // 标记是否已开始生成
+  
+  // 监听客户端断开连接（使用 res.on('close') 更可靠）
+  res.on('close', () => {
+    // 只有在正在生成且响应未正常结束时才认为是客户端中止
+    if (isGenerating && !res.writableFinished) {
+      console.log(`[Generate/Stream] 客户端断开连接，取消生成: ${req.user?.email}`);
+      isAborted = true;
+      abortController.abort();
+    }
+  });
+  
   try {
     const userId = new mongoose.Types.ObjectId(req.user!.userId);
-    const { dailyLog, modelId, thinkingMode } = req.body;
+    const { dailyLog, modelId, thinkingMode, dateRange } = req.body;
 
     // 验证 dailyLog
     if (!dailyLog || typeof dailyLog !== 'string') {
@@ -276,15 +297,6 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
       };
     }
 
-    // 构建 GeneratorConfig
-    const generatorConfig: GeneratorConfig = {
-      primary: {
-        modelId: usedModelId as any,
-        apiKey,
-        endpointId: platform === 'doubao' ? user.config.doubaoEndpoint : undefined,
-      },
-    };
-
     // 设置 SSE 响应头
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
@@ -299,6 +311,17 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
     const isReasoning = isReasoningModel(usedModelId as any);
     const thinkingEnabled = isReasoning && thinkingMode !== 'disabled';
 
+    // 构建 GeneratorConfig（需要在判断 isReasoning 之后）
+    const generatorConfig: GeneratorConfig = {
+      primary: {
+        modelId: usedModelId as any,
+        apiKey,
+        endpointId: platform === 'doubao' ? user.config.doubaoEndpoint : undefined,
+        // 只有推理模型才传递 thinkingMode
+        ...(isReasoning && thinkingMode ? { thinkingMode } : {}),
+      },
+    };
+
     console.log(
       `[Generate/Stream] 开始流式生成: ${req.user!.email}, 模型: ${usedModelId}${thinkingEnabled ? ', 推理模式: ' + (thinkingMode || 'auto') : ''}`
     );
@@ -310,9 +333,13 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
       }
     };
 
+    // 累积生成的内容用于保存历史
+    let fullOutput = '';
+
     // 流式回调
     const streamCallbacks: StreamCallbacks = {
       onChunk: (chunk: string) => {
+        fullOutput += chunk; // 累积内容
         res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
         flushResponse();
       },
@@ -322,15 +349,75 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
       } : undefined,
     };
 
-    // 调用流式生成
+    // 标记开始生成（用于判断客户端中止）
+    isGenerating = true;
+    
+    // 调用流式生成（传递 signal 用于取消）
     const result = await generateReportStream(
       weeklyLog,
       generatorConfig,
       streamCallbacks,
-      { customTemplate }
+      { customTemplate, signal: abortController.signal }
     );
 
+    // 如果已中止，不再继续处理
+    if (isAborted) {
+      console.log(`[Generate/Stream] 生成已取消，跳过后续处理: ${req.user!.email}`);
+      return;
+    }
+
     console.log(`[Generate/Stream] 流式生成完成: ${req.user!.email}`);
+
+    // 记录完成时间
+    const completedAt = new Date();
+
+    // 保存生成历史
+    try {
+      let dateStart: string | undefined;
+      let dateEnd: string | undefined;
+      let dateRangeLabel: string;
+
+      if (dateRange?.startDate && dateRange?.endDate) {
+        // 场景1：前端传递了明确的日期范围（导入模式）
+        dateStart = dateRange.startDate;
+        dateEnd = dateRange.endDate;
+        // 格式化为展示标签 "01-13 ~ 01-17"
+        dateRangeLabel = `${dateRange.startDate.slice(5)} ~ ${dateRange.endDate.slice(5)}`;
+      } else {
+        // 场景2：手动输入，从内容中解析
+        const dates = weeklyLog.entries
+          .map(e => e.date)
+          .filter(d => d && d !== '未标注');
+        
+        if (dates.length > 0) {
+          dates.sort();
+          dateRangeLabel = `${dates[0]} ~ ${dates[dates.length - 1]}`;
+        } else {
+          // 场景3：无法解析日期，显示"手动输入"
+          dateRangeLabel = '手动输入';
+        }
+      }
+
+      await GenerationHistory.create({
+        userId,
+        dateStart,
+        dateEnd,
+        dateRangeLabel,
+        inputText: dailyLog,
+        outputMarkdown: fullOutput,
+        modelId: result.modelId,
+        modelName: result.modelName,
+        promptTemplateId: activeTemplate?._id,
+        promptTemplateName: activeTemplate?.name || 'Default',
+        generatedAt,
+        completedAt,
+      });
+
+      console.log(`[Generate/Stream] 保存历史: ${req.user!.email} - ${dateRangeLabel}`);
+    } catch (historyError) {
+      // 历史保存失败不影响主流程，只记录日志
+      console.error('[Generate/Stream] 保存历史失败:', historyError);
+    }
 
     // 发送完成事件
     res.write(
@@ -343,6 +430,15 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
 
     res.end();
   } catch (error) {
+    // 如果是因为客户端中止导致的错误，静默处理
+    if (isAborted) {
+      console.log(`[Generate/Stream] 生成被客户端中止: ${req.user?.email}`);
+      if (!res.writableEnded) {
+        res.end();
+      }
+      return;
+    }
+
     console.error('[Generate/Stream] 流式生成错误:', error);
 
     // 如果还没有发送响应头，返回 JSON 错误
