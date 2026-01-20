@@ -83,18 +83,6 @@ fi
 echo "✅ MongoDB 运行中"
 echo ""
 
-# 编译 Web UI（产物输出到 packages/cli/web-dist）
-echo "🖥️  编译 Web UI..."
-pnpm --filter weeknote-cli build
-
-if [ $? -ne 0 ]; then
-  echo "❌ Web UI 编译失败"
-  exit 1
-fi
-
-echo "✅ Web UI 编译完成"
-echo ""
-
 # 编译后端
 echo "📦 编译后端代码..."
 pnpm --filter @weeknote/server build
@@ -107,7 +95,36 @@ fi
 echo "✅ 后端编译完成"
 echo ""
 
-# 启动服务
-echo "🚀 启动云端后端服务..."
+# 启动后端服务（后台运行）
+echo "🚀 启动后端 API 服务（后台）..."
+pnpm --filter @weeknote/server start &
+BACKEND_PID=$!
+
+# 等待后端启动
+sleep 2
+
+# 检查后端是否启动成功
+if ! kill -0 $BACKEND_PID 2>/dev/null; then
+  echo "❌ 后端启动失败"
+  exit 1
+fi
+
+echo "✅ 后端已启动 (PID: $BACKEND_PID)"
 echo ""
-pnpm --filter @weeknote/server start
+
+# 启动前端开发服务器
+echo "🖥️  启动前端开发服务器..."
+echo ""
+echo "============================================================"
+echo "  📍 后端 API:  http://localhost:3000"
+echo "  📍 前端 Web:  http://localhost:5173"
+echo "============================================================"
+echo ""
+
+# 前台运行前端，Ctrl+C 时同时停止后端
+trap "echo ''; echo '🛑 正在停止服务...'; kill $BACKEND_PID 2>/dev/null; exit 0" SIGINT SIGTERM
+
+pnpm --filter @weeknote/web dev
+
+# 前端退出后停止后端
+kill $BACKEND_PID 2>/dev/null
