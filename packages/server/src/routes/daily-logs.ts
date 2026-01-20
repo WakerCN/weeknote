@@ -379,7 +379,7 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // 生成文本格式
+    // 生成文本格式（符合 Daily Log 解析器期望的格式）
     const lines: string[] = [];
     let filledDays = 0;
 
@@ -389,33 +389,43 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
       if (!hasContent) continue;
 
       filledDays++;
-      lines.push(`## ${record.date} ${record.dayOfWeek}`);
-      lines.push('');
-
+      
+      // 日期格式：从 "2024-12-23" 提取 "12-23"，配合 "周X"
+      const shortDate = record.date.slice(5); // "12-23"
+      lines.push(`${shortDate} | ${record.dayOfWeek}`);
+      
+      // Plan 段落
+      lines.push('Plan');
       if (record.plan.trim()) {
-        lines.push('### Plan');
         lines.push(record.plan.trim());
-        lines.push('');
       }
+      lines.push('');
+      
+      // Result 段落
+      lines.push('Result');
       if (record.result.trim()) {
-        lines.push('### Result');
         lines.push(record.result.trim());
-        lines.push('');
       }
+      lines.push('');
+      
+      // Issues 段落
+      lines.push('Issues');
       if (record.issues.trim()) {
-        lines.push('### Issues');
         lines.push(record.issues.trim());
-        lines.push('');
       }
+      lines.push('');
+      
+      // Notes 段落
+      lines.push('Notes');
       if (record.notes.trim()) {
-        lines.push('### Notes');
         lines.push(record.notes.trim());
-        lines.push('');
       }
+      lines.push('');
+      lines.push('');
     }
 
     res.json({
-      text: lines.join('\n'),
+      text: lines.join('\n').trim(),
       startDate,
       endDate,
       filledDays,
