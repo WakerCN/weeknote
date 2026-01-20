@@ -8,7 +8,7 @@ import globals from 'globals';
 export default [
   js.configs.recommended,
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '**/web-dist/**', '**/*.config.js', '**/*.config.ts'],
+    ignores: ['**/dist/**', '**/node_modules/**', '**/*.config.js', '**/*.config.ts'],
   },
   {
     files: ['packages/*/src/**/*.{ts,tsx}'],

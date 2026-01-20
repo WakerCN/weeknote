@@ -5,19 +5,19 @@
   "type": "module",
   "scripts": {
     "preinstall": "node ./scripts/check-env.mjs",
-    "dev": "pnpm build:cli && cd packages/cli && node dist/index.js serve",
-    "dev:hot": "pnpm build:core && pnpm --filter weeknote-cli exec tsc && concurrently -k -n api,web -c blue,green \"pnpm dev:api\" \"pnpm dev:web\"",
-    "dev:api": "cd packages/cli && node --watch dist/index.js serve --no-open",
+    "dev": "concurrently -k -n server,web -c blue,green \"pnpm dev:server\" \"pnpm dev:web\"",
+    "dev:server": "pnpm --filter @weeknote/server build && pnpm --filter @weeknote/server start",
     "dev:web": "pnpm --filter @weeknote/web dev",
     "build": "pnpm -r build",
     "build:core": "pnpm --filter @weeknote/core build",
     "build:cli": "pnpm --filter weeknote-cli build",
     "build:web": "pnpm --filter @weeknote/web build",
+    "build:server": "pnpm --filter @weeknote/server build",
+    "start:server": "pnpm --filter @weeknote/server start",
     "test": "pnpm -r test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "serve": "cd packages/cli && node dist/index.js serve",
     "cli": "cd packages/cli && node dist/index.js"
   },
   "devDependencies": {
