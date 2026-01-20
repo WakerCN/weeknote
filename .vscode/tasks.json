@@ -1,0 +1,116 @@
+{
+  "version": "2.0.0",
+  "options": {
+    "shell": {
+      "executable": "/bin/zsh",
+      "args": [
+        "-c"
+      ]
+    },
+    "env": {
+      "NVM_DIR": "${env:HOME}/.nvm"
+    }
+  },
+  // 定义公共的 nvm 初始化命令（切换 Node 并覆盖 PATH）
+  // NVM_INIT: source nvm → use 18 → 把 nvm bin 放到 PATH 最前面
+  "tasks": [
+    // ============================================
+    // 编译任务
+    // ============================================
+    {
+      "label": "Build: Core",
+      "type": "shell",
+      "command": "source $NVM_DIR/nvm.sh && nvm use 18 && export PATH=\"$NVM_BIN:$PATH\" && pnpm build:core",
+      "group": "build",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    {
+      "label": "Build: Server",
+      "type": "shell",
+      "command": "source $NVM_DIR/nvm.sh && nvm use 18 && export PATH=\"$NVM_BIN:$PATH\" && pnpm build:server",
+      "group": "build",
+      "dependsOn": [
+        "Build: Core"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": [
+        "$tsc"
+      ]
+    },
+    // ============================================
+    // 启动任务
+    // ============================================
+    {
+      "label": "Start: Server",
+      "type": "shell",
+      "command": "source $NVM_DIR/nvm.sh && nvm use 18 && export PATH=\"$NVM_BIN:$PATH\" && pnpm start:server",
+      "group": "none",
+      "isBackground": true,
+      "dependsOn": [
+        "Build: Server"
+      ],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev"
+      },
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Server.*|^.*nvm.*",
+          "endsPattern": "^.*listening on port.*|^.*MongoDB connected.*"
+        }
+      }
+    },
+    {
+      "label": "Start: Web",
+      "type": "shell",
+      "command": "source $NVM_DIR/nvm.sh && nvm use 18 && export PATH=\"$NVM_BIN:$PATH\" && pnpm dev:web",
+      "group": "none",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "dev"
+      },
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*VITE.*|^.*nvm.*",
+          "endsPattern": "^.*Local:.*http.*"
+        }
+      }
+    },
+    // ============================================
+    // 组合任务
+    // ============================================
+    {
+      "label": "Dev: Start All",
+      "dependsOn": [
+        "Start: Server",
+        "Start: Web"
+      ],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}

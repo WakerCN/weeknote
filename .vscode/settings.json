@@ -18,5 +18,17 @@
     "titleBar.inactiveBackground": "#10b98199",
     "titleBar.inactiveForeground": "#15202b99"
   },
-  "peacock.color": "#10b981"
+  "peacock.color": "#10b981",
+
+  // 终端配置：确保使用交互式 zsh，加载 .zshrc
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.profiles.osx": {
+    "zsh": {
+      "path": "/bin/zsh",
+      "args": ["-l"]
+    }
+  },
+  
+  // Task 运行器配置
+  "task.autoDetect": "off"
 }
