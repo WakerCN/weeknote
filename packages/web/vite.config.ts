@@ -10,9 +10,9 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // 构建产物输出到 CLI 包的 web-dist 目录
+  // 构建产物输出到默认的 dist 目录
   build: {
-    outDir: path.resolve(__dirname, '../cli/web-dist'),
+    outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
       output: {
