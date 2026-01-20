@@ -157,14 +157,13 @@ export default function DailyLog() {
         toast.warning('所选时间段暂无记录');
         return;
       }
-      navigate('/', { 
-        state: { 
-          dailyLog: result.text,
-          dateRange: { startDate: exportStartDate, endDate: exportEndDate }
-        }, 
-        scope: 'root' 
-      });
-      toast.success('已导入到首页');
+      // 使用 sessionStorage 传递一次性数据，避免 location.state 导致的重复触发问题
+      sessionStorage.setItem('weeknote_import', JSON.stringify({
+        dailyLog: result.text,
+        dateRange: { startDate: exportStartDate, endDate: exportEndDate },
+        filledDays: result.filledDays,
+      }));
+      navigate('/', { scope: 'root' });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : '导出失败');
     }
