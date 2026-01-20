@@ -5,8 +5,6 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { connectDB } from './db/connection.js';
 import { checkJwtSecretConfig } from './auth/jwt.js';
 import authRouter from './routes/auth.js';
@@ -21,9 +19,6 @@ import { cloudReminderScheduler } from './services/reminder-scheduler.js';
 
 // 加载环境变量
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // 配置
 const PORT = process.env.PORT || 3000;
@@ -72,16 +67,9 @@ app.use('/api/config', configRouter);
 app.use('/api/generate', generationRouter);
 app.use('/api/reminder', reminderRouter);
 
-// 静态文件服务（前端）
-// 说明：
-// - 生产环境执行的是 packages/server/dist/index.js，因此 __dirname 指向 dist/ 目录
-// - Web 构建产物位于 packages/cli/web-dist
-const webDistPath = path.resolve(__dirname, '../../cli/web-dist');
-app.use(express.static(webDistPath));
-
-// SPA 路由回退
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(webDistPath, 'index.html'));
+// 404 处理
+app.use((_req, res) => {
+  res.status(404).json({ error: 'Not Found' });
 });
 
 // 全局错误处理
@@ -113,14 +101,15 @@ async function startServer() {
     app.listen(PORT, () => {
       console.log('');
       console.log('='.repeat(60));
-      console.log('  WeekNote 云端服务已启动 🚀');
+      console.log('  WeekNote 后端 API 服务已启动 🚀');
       console.log('='.repeat(60));
       console.log('');
-      console.log(`  服务地址:     http://localhost:${PORT}`);
-      console.log(`  Web UI:       http://localhost:${PORT}`);
+      console.log(`  API 地址:     http://localhost:${PORT}`);
       console.log(`  健康检查:     http://localhost:${PORT}/api/health`);
-      console.log('');
       console.log(`  MongoDB:      ${MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')}`);
+      console.log('');
+      console.log('  💡 前端开发: pnpm --filter @weeknote/web dev');
+      console.log('     访问地址: http://localhost:5173');
       console.log('');
       console.log('='.repeat(60));
       console.log('');
