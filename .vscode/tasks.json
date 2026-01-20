@@ -3,51 +3,49 @@
   "options": {
     "shell": {
       "executable": "/bin/zsh",
-      "args": [
-        "-c"
-      ]
+      "args": ["-c"]
     },
     "env": {
       "NVM_DIR": "${env:HOME}/.nvm"
     }
   },
-  // 定义公共的 nvm 初始化命令（切换 Node 并覆盖 PATH）
-  // NVM_INIT: source nvm → use 18 → 把 nvm bin 放到 PATH 最前面
   "tasks": [
     // ============================================
-    // 编译任务
+    // 🔨 编译任务 (Build)
     // ============================================
     {
       "label": "Build: Core",
       "type": "shell",
       "command": "source $NVM_DIR/nvm.sh && nvm use 18 && export PATH=\"$NVM_BIN:$PATH\" && pnpm build:core",
       "group": "build",
+      "icon": {
+        "id": "package",
+        "color": "terminal.ansiYellow"
+      },
       "presentation": {
         "reveal": "silent",
         "panel": "shared"
       },
-      "problemMatcher": [
-        "$tsc"
-      ]
+      "problemMatcher": ["$tsc"]
     },
     {
       "label": "Build: Server",
       "type": "shell",
       "command": "source $NVM_DIR/nvm.sh && nvm use 18 && export PATH=\"$NVM_BIN:$PATH\" && pnpm build:server",
       "group": "build",
-      "dependsOn": [
-        "Build: Core"
-      ],
+      "dependsOn": ["Build: Core"],
+      "icon": {
+        "id": "server-process",
+        "color": "terminal.ansiRed"
+      },
       "presentation": {
         "reveal": "silent",
         "panel": "shared"
       },
-      "problemMatcher": [
-        "$tsc"
-      ]
+      "problemMatcher": ["$tsc"]
     },
     // ============================================
-    // 启动任务
+    // 🚀 启动任务 (Start)
     // ============================================
     {
       "label": "Start: Server",
@@ -55,9 +53,11 @@
       "command": "source $NVM_DIR/nvm.sh && nvm use 18 && export PATH=\"$NVM_BIN:$PATH\" && pnpm start:server",
       "group": "none",
       "isBackground": true,
-      "dependsOn": [
-        "Build: Server"
-      ],
+      "dependsOn": ["Build: Server"],
+      "icon": {
+        "id": "server",
+        "color": "terminal.ansiGreen"
+      },
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
@@ -80,6 +80,10 @@
       "command": "source $NVM_DIR/nvm.sh && nvm use 18 && export PATH=\"$NVM_BIN:$PATH\" && pnpm dev:web",
       "group": "none",
       "isBackground": true,
+      "icon": {
+        "id": "globe",
+        "color": "terminal.ansiBlue"
+      },
       "presentation": {
         "reveal": "always",
         "panel": "dedicated",
@@ -97,15 +101,16 @@
       }
     },
     // ============================================
-    // 组合任务
+    // ⚡ 组合任务 (Combo)
     // ============================================
     {
       "label": "Dev: Start All",
-      "dependsOn": [
-        "Start: Server",
-        "Start: Web"
-      ],
+      "dependsOn": ["Start: Server", "Start: Web"],
       "dependsOrder": "parallel",
+      "icon": {
+        "id": "rocket",
+        "color": "terminal.ansiMagenta"
+      },
       "group": {
         "kind": "build",
         "isDefault": true
