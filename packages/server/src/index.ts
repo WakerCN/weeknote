@@ -5,7 +5,7 @@
 import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
-import { connectDB } from './db/connection.js';
+import { connectDB, disconnectDB, isDBConnected } from './db/connection.js';
 import { checkJwtSecretConfig } from './auth/jwt.js';
 import authRouter from './routes/auth.js';
 import dailyLogsRouter from './routes/daily-logs.js';
@@ -23,8 +23,9 @@ import {
   getLogConfig,
 } from './logger/index.js';
 
-// 加载环境变量
-dotenv.config();
+// 加载环境变量（支持从项目根目录和当前目录加载）
+dotenv.config(); // 当前目录
+dotenv.config({ path: '../../.env' }); // 项目根目录（monorepo 结构）
 
 // 创建 Logger
 const logger = createLogger('Server');
@@ -49,10 +50,16 @@ app.use(httpLoggerMiddleware());
 
 // 健康检查
 app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
+  const dbConnected = isDBConnected();
+
+  res.status(dbConnected ? 200 : 503).json({
+    status: dbConnected ? 'ok' : 'degraded',
     message: 'WeekNote API is running',
-    mongodb: MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@'), // 脱敏
+    mongodb: {
+      connected: dbConnected,
+      uri: MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@'),
+    },
+    timestamp: new Date().toISOString(),
   });
 });
 
@@ -131,16 +138,30 @@ async function startServer() {
   }
 }
 
-// 优雅关闭
-process.on('SIGINT', async () => {
-  logger.info('正在关闭服务...');
-  process.exit(0);
-});
+/**
+ * 优雅关闭处理
+ */
+async function gracefulShutdown(signal: string): Promise<void> {
+  logger.info(`收到 ${signal} 信号，正在关闭服务...`);
 
-process.on('SIGTERM', async () => {
-  logger.info('正在关闭服务...');
-  process.exit(0);
-});
+  try {
+    // 停止提醒调度器
+    cloudReminderScheduler.stop();
+
+    // 断开数据库连接
+    await disconnectDB();
+
+    logger.info('服务已优雅关闭');
+    process.exit(0);
+  } catch (error) {
+    logger.error('关闭服务时出错', error as Error);
+    process.exit(1);
+  }
+}
+
+// 注册信号处理器
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // 启动服务器
 startServer();
