@@ -27,6 +27,12 @@ const MENU_ITEMS = [
     label: '提醒设置',
     description: '配置微信提醒通知',
   },
+  {
+    path: '/settings/account',
+    icon: '👤',
+    label: '账号管理',
+    description: '管理账号信息和安全设置',
+  },
 ];
 
 export default function SettingsLayout() {
