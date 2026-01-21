@@ -8,8 +8,10 @@ import mongoose from 'mongoose';
 import { PromptTemplate } from '../db/models/PromptTemplate.js';
 import { authMiddleware, optionalAuthMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
 import { DEFAULT_SYSTEM_PROMPT, DEFAULT_USER_PROMPT_TEMPLATE } from '@weeknote/core';
+import { createLogger } from '../logger/index.js';
 
 const router: Router = Router();
+const logger = createLogger('Prompt');
 
 /**
  * GET /api/prompts
@@ -34,7 +36,7 @@ router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (error) {
-    console.error('[Prompt] 获取模板列表失败:', error);
+    logger.error('获取模板列表失败', error as Error);
     res.status(500).json({
       error: error instanceof Error ? error.message : '获取模板失败',
     });
@@ -72,7 +74,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('[Prompt] 获取公开模板失败:', error);
+      logger.error('获取公开模板失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '获取模板失败',
       });
@@ -115,7 +117,7 @@ router.get(
         template,
       });
     } catch (error) {
-      console.error('[Prompt] 获取模板详情失败:', error);
+      logger.error('获取模板详情失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '获取模板失败',
       });
@@ -166,14 +168,14 @@ router.post(
         likeCount: 0,
       });
 
-      console.log(`[Prompt] 创建模板: ${req.user!.email} - ${name}`);
+      logger.success('创建模板', { email: req.user!.email, name });
 
       res.status(201).json({
         success: true,
         template,
       });
     } catch (error) {
-      console.error('[Prompt] 创建模板失败:', error);
+      logger.error('创建模板失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '创建模板失败',
       });
@@ -238,14 +240,14 @@ router.put(
 
       await template.save();
 
-      console.log(`[Prompt] 更新模板: ${req.user!.email} - ${templateId}`);
+      logger.info('更新模板', { email: req.user!.email, templateId });
 
       res.json({
         success: true,
         template,
       });
     } catch (error) {
-      console.error('[Prompt] 更新模板失败:', error);
+      logger.error('更新模板失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '更新模板失败',
       });
@@ -287,14 +289,14 @@ router.delete(
 
       await template.deleteOne();
 
-      console.log(`[Prompt] 删除模板: ${req.user!.email} - ${templateId}`);
+      logger.info('删除模板', { email: req.user!.email, templateId });
 
       res.json({
         success: true,
         message: '删除成功',
       });
     } catch (error) {
-      console.error('[Prompt] 删除模板失败:', error);
+      logger.error('删除模板失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '删除模板失败',
       });
@@ -339,14 +341,14 @@ router.post(
       template.isActive = true;
       await template.save();
 
-      console.log(`[Prompt] 激活模板: ${req.user!.email} - ${templateId}`);
+      logger.success('激活模板', { email: req.user!.email, templateId });
 
       res.json({
         success: true,
         template,
       });
     } catch (error) {
-      console.error('[Prompt] 激活模板失败:', error);
+      logger.error('激活模板失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '激活模板失败',
       });
@@ -388,7 +390,7 @@ router.post(
         likeCount: template.likeCount,
       });
     } catch (error) {
-      console.error('[Prompt] 点赞失败:', error);
+      logger.error('点赞失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '点赞失败',
       });

@@ -7,8 +7,10 @@ import { body } from 'express-validator';
 import mongoose from 'mongoose';
 import { User } from '../db/models/User.js';
 import { authMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
+import { createLogger } from '../logger/index.js';
 
 const router: Router = Router();
+const logger = createLogger('Config');
 
 // 所有路由都需要认证
 router.use(authMiddleware);
@@ -32,7 +34,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       config: user.config,
     });
   } catch (error) {
-    console.error('[Config] 获取配置失败:', error);
+    logger.error('获取配置失败', error as Error);
     res.status(500).json({
       error: error instanceof Error ? error.message : '获取配置失败',
     });
@@ -90,14 +92,14 @@ router.put(
 
       await user.save();
 
-      console.log(`[Config] 更新配置: ${req.user!.email}`);
+      logger.success('更新配置', { email: req.user!.email });
 
       res.json({
         success: true,
         config: user.config,
       });
     } catch (error) {
-      console.error('[Config] 更新配置失败:', error);
+      logger.error('更新配置失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '更新配置失败',
       });
@@ -134,14 +136,14 @@ router.delete(
 
       await user.save();
 
-      console.log(`[Config] 删除 API Key: ${req.user!.email} - ${platform}`);
+      logger.info('删除 API Key', { email: req.user!.email, platform });
 
       res.json({
         success: true,
         message: '删除成功',
       });
     } catch (error) {
-      console.error('[Config] 删除 API Key 失败:', error);
+      logger.error('删除 API Key 失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '删除 API Key 失败',
       });

@@ -16,9 +16,18 @@ import generationRouter from './routes/generation.js';
 import reminderRouter from './routes/reminder.js';
 import { MODEL_REGISTRY } from '@weeknote/core';
 import { cloudReminderScheduler } from './services/reminder-scheduler.js';
+import {
+  createLogger,
+  requestIdMiddleware,
+  httpLoggerMiddleware,
+  getLogConfig,
+} from './logger/index.js';
 
 // 加载环境变量
 dotenv.config();
+
+// 创建 Logger
+const logger = createLogger('Server');
 
 // 配置
 const PORT = process.env.PORT || 3000;
@@ -32,11 +41,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// 请求日志
-app.use((req, _res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
-  next();
-});
+// 请求 ID 中间件（必须在 httpLogger 之前）
+app.use(requestIdMiddleware());
+
+// HTTP 请求日志中间件
+app.use(httpLoggerMiddleware());
 
 // 健康检查
 app.get('/api/health', (_req, res) => {
@@ -73,8 +82,9 @@ app.use((_req, res) => {
 });
 
 // 全局错误处理
+const errorLogger = createLogger('Error');
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error('[Error]', err);
+  errorLogger.error('服务器内部错误', err);
   res.status(500).json({
     error: '服务器内部错误',
     message: err.message,
@@ -90,44 +100,45 @@ async function startServer() {
     checkJwtSecretConfig();
 
     // 连接 MongoDB
-    console.log('[Server] 正在连接 MongoDB...');
+    logger.info('正在连接 MongoDB...');
     await connectDB();
-    console.log('[Server] MongoDB 连接成功');
 
     // 启动提醒调度器
     cloudReminderScheduler.start();
 
+    // 获取日志配置用于展示
+    const logConfig = getLogConfig();
+
     // 启动 HTTP 服务器
     app.listen(PORT, () => {
-      console.log('');
-      console.log('='.repeat(60));
-      console.log('  WeekNote 后端 API 服务已启动 🚀');
-      console.log('='.repeat(60));
-      console.log('');
-      console.log(`  API 地址:     http://localhost:${PORT}`);
-      console.log(`  健康检查:     http://localhost:${PORT}/api/health`);
-      console.log(`  MongoDB:      ${MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')}`);
-      console.log('');
-      console.log('  💡 前端开发: pnpm --filter @weeknote/web dev');
-      console.log('     访问地址: http://localhost:5173');
-      console.log('');
-      console.log('='.repeat(60));
-      console.log('');
+      logger.box({
+        title: '🚀 WeekNote 后端 API 服务已启动',
+        lines: [
+          `📍 API 地址:     http://localhost:${PORT}`,
+          `💊 健康检查:     http://localhost:${PORT}/api/health`,
+          `🗄️  MongoDB:      ${MONGODB_URI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')}`,
+          `📝 日志级别:     ${logConfig.level}`,
+          `📂 文件日志:     ${logConfig.enableFileLog ? logConfig.dir : '禁用'}`,
+          '',
+          `💡 前端开发: pnpm --filter @weeknote/web dev`,
+          `   访问地址: http://localhost:5173`,
+        ],
+      });
     });
   } catch (error) {
-    console.error('[Server] 启动失败:', error);
+    logger.error('启动失败', error as Error);
     process.exit(1);
   }
 }
 
 // 优雅关闭
 process.on('SIGINT', async () => {
-  console.log('\n[Server] 正在关闭服务...');
+  logger.info('正在关闭服务...');
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\n[Server] 正在关闭服务...');
+  logger.info('正在关闭服务...');
   process.exit(0);
 });
 

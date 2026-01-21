@@ -3,6 +3,9 @@
  */
 
 import jwt, { SignOptions } from 'jsonwebtoken';
+import { createLogger } from '../logger/index.js';
+
+const logger = createLogger('Auth');
 
 /**
  * JWT 配置
@@ -145,6 +148,6 @@ export function verifyRefreshToken(token: string): DecodedToken {
  */
 export function checkJwtSecretConfig(): void {
   if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
-    console.warn('[Auth] ⚠️  警告: 生产环境未配置 JWT_SECRET，请设置环境变量！');
+    logger.warn('生产环境未配置 JWT_SECRET，请设置环境变量！');
   }
 }

@@ -14,8 +14,10 @@ import {
   parseLocalDate,
   formatLocalDate,
 } from '@weeknote/core';
+import { createLogger } from '../logger/index.js';
 
 const router: Router = Router();
+const logger = createLogger('Daily');
 
 // 所有路由都需要认证
 router.use(authMiddleware);
@@ -44,7 +46,7 @@ router.get(
         record: record || null,
       });
     } catch (error) {
-      console.error('[Daily Log] 获取记录失败:', error);
+      logger.error('获取记录失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '获取记录失败',
       });
@@ -112,14 +114,14 @@ router.post(
         { upsert: true, new: true }
       );
 
-      console.log(`[Daily Log] 保存记录: ${req.user!.email} - ${date}`);
+      logger.info('保存记录', { email: req.user!.email, date });
 
       res.json({
         success: true,
         record,
       });
     } catch (error) {
-      console.error('[Daily Log] 保存记录失败:', error);
+      logger.error('保存记录失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '保存记录失败',
       });
@@ -171,7 +173,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('[Daily Log] 获取时间段记录失败:', error);
+      logger.error('获取时间段记录失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '获取记录失败',
       });
@@ -203,14 +205,14 @@ router.delete(
         return;
       }
 
-      console.log(`[Daily Log] 删除记录: ${req.user!.email} - ${date}`);
+      logger.info('删除记录', { email: req.user!.email, date });
 
       res.json({
         success: true,
         message: '删除成功',
       });
     } catch (error) {
-      console.error('[Daily Log] 删除记录失败:', error);
+      logger.error('删除记录失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '删除记录失败',
       });
@@ -286,7 +288,7 @@ router.get('/weeks', async (req: AuthRequest, res: Response) => {
 
     res.json({ weeks });
   } catch (error) {
-    console.error('[Daily Log] 获取周列表失败:', error);
+    logger.error('获取周列表失败', error as Error);
     res.status(500).json({
       error: error instanceof Error ? error.message : '获取周列表失败',
     });
@@ -325,7 +327,7 @@ router.get('/week', async (req: AuthRequest, res: Response) => {
         records.length > 0 ? records[records.length - 1].updatedAt : new Date().toISOString(),
     });
   } catch (error) {
-    console.error('[Daily Log] 获取周记录失败:', error);
+    logger.error('获取周记录失败', error as Error);
     res.status(500).json({
       error: error instanceof Error ? error.message : '获取周记录失败',
     });
@@ -431,7 +433,7 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
       filledDays,
     });
   } catch (error) {
-    console.error('[Daily Log] 导出失败:', error);
+    logger.error('导出失败', error as Error);
     res.status(500).json({
       error: error instanceof Error ? error.message : '导出失败',
     });
@@ -483,7 +485,7 @@ router.get(
         days,
       });
     } catch (error) {
-      console.error('[Daily Log] 获取月份摘要失败:', error);
+      logger.error('获取月份摘要失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '获取月份摘要失败',
       });
@@ -530,7 +532,7 @@ router.get('/stats', async (req: AuthRequest, res: Response) => {
       totalDays: 7,
     });
   } catch (error) {
-    console.error('[Daily Log] 获取统计失败:', error);
+    logger.error('获取统计失败', error as Error);
     res.status(500).json({
       error: error instanceof Error ? error.message : '获取统计失败',
     });

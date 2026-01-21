@@ -20,8 +20,10 @@ import {
   type StreamCallbacks,
   type ValidationWarning,
 } from '@weeknote/core';
+import { createLogger } from '../logger/index.js';
 
 const router: Router = Router();
+const logger = createLogger('Generate');
 
 // 所有路由都需要认证
 router.use(authMiddleware);
@@ -189,7 +191,11 @@ router.post(
         completedAt,
       });
 
-      console.log(`[Generate] 生成周报: ${req.user!.email} - ${startDate} ~ ${endDate} - ${result.modelId}`);
+      logger.success('生成周报', {
+        email: req.user!.email,
+        dateRange: `${startDate} ~ ${endDate}`,
+        model: result.modelId,
+      });
 
       res.json({
         success: true,
@@ -201,7 +207,7 @@ router.post(
         },
       });
     } catch (error) {
-      console.error('[Generate] 生成周报失败:', error);
+      logger.error('生成周报失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '生成周报失败',
       });
@@ -237,7 +243,7 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
   res.on('close', () => {
     // 只有在正在生成且响应未正常结束时才认为是客户端中止
     if (isGenerating && !res.writableFinished) {
-      console.log(`[Generate/Stream] 客户端断开连接，取消生成: ${req.user?.email}`);
+      logger.warn('客户端断开连接，取消生成', { email: req.user?.email });
       isAborted = true;
       abortController.abort();
     }
@@ -322,9 +328,11 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
       },
     };
 
-    console.log(
-      `[Generate/Stream] 开始流式生成: ${req.user!.email}, 模型: ${usedModelId}${thinkingEnabled ? ', 推理模式: ' + (thinkingMode || 'auto') : ''}`
-    );
+    logger.info('开始流式生成', {
+      email: req.user!.email,
+      model: usedModelId,
+      ...(thinkingEnabled && { thinkingMode: thinkingMode || 'auto' }),
+    });
 
     // 辅助函数：刷新响应
     const flushResponse = () => {
@@ -362,11 +370,11 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
 
     // 如果已中止，不再继续处理
     if (isAborted) {
-      console.log(`[Generate/Stream] 生成已取消，跳过后续处理: ${req.user!.email}`);
+      logger.debug('生成已取消，跳过后续处理', { email: req.user!.email });
       return;
     }
 
-    console.log(`[Generate/Stream] 流式生成完成: ${req.user!.email}`);
+    logger.success('流式生成完成', { email: req.user!.email });
 
     // 记录完成时间
     const completedAt = new Date();
@@ -413,10 +421,10 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
         completedAt,
       });
 
-      console.log(`[Generate/Stream] 保存历史: ${req.user!.email} - ${dateRangeLabel}`);
+      logger.debug('保存历史', { email: req.user!.email, dateRange: dateRangeLabel });
     } catch (historyError) {
       // 历史保存失败不影响主流程，只记录日志
-      console.error('[Generate/Stream] 保存历史失败:', historyError);
+      logger.error('保存历史失败', historyError as Error);
     }
 
     // 发送完成事件
@@ -432,14 +440,14 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
   } catch (error) {
     // 如果是因为客户端中止导致的错误，静默处理
     if (isAborted) {
-      console.log(`[Generate/Stream] 生成被客户端中止: ${req.user?.email}`);
+      logger.debug('生成被客户端中止', { email: req.user?.email });
       if (!res.writableEnded) {
         res.end();
       }
       return;
     }
 
-    console.error('[Generate/Stream] 流式生成错误:', error);
+    logger.error('流式生成错误', error as Error);
 
     // 如果还没有发送响应头，返回 JSON 错误
     if (!res.headersSent) {

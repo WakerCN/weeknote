@@ -7,8 +7,10 @@ import { param, query } from 'express-validator';
 import mongoose from 'mongoose';
 import { GenerationHistory } from '../db/models/GenerationHistory.js';
 import { authMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
+import { createLogger } from '../logger/index.js';
 
 const router: Router = Router();
+const logger = createLogger('History');
 
 // 所有路由都需要认证
 router.use(authMiddleware);
@@ -44,7 +46,7 @@ router.get(
         },
       });
     } catch (error) {
-      console.error('[History] 获取历史列表失败:', error);
+      logger.error('获取历史列表失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '获取历史失败',
       });
@@ -80,7 +82,7 @@ router.get(
         history,
       });
     } catch (error) {
-      console.error('[History] 获取历史详情失败:', error);
+      logger.error('获取历史详情失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '获取历史失败',
       });
@@ -111,14 +113,14 @@ router.delete(
         return;
       }
 
-      console.log(`[History] 删除历史: ${req.user!.email} - ${historyId}`);
+      logger.info('删除历史', { email: req.user!.email, historyId });
 
       res.json({
         success: true,
         message: '删除成功',
       });
     } catch (error) {
-      console.error('[History] 删除历史失败:', error);
+      logger.error('删除历史失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '删除历史失败',
       });

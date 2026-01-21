@@ -13,8 +13,10 @@ import {
   verifyRefreshToken,
 } from '../auth/index.js';
 import { authMiddleware, validateRequest, AuthRequest } from '../middleware/index.js';
+import { createLogger } from '../logger/index.js';
 
 const router: Router = Router();
+const logger = createLogger('Auth');
 
 /**
  * POST /api/auth/register
@@ -65,7 +67,7 @@ router.post(
         email: user.email,
       });
 
-      console.log(`[Auth] 新用户注册: ${user.email}`);
+      logger.success('新用户注册', { email: user.email });
 
       res.status(201).json({
         success: true,
@@ -77,7 +79,7 @@ router.post(
         ...tokens,
       });
     } catch (error) {
-      console.error('[Auth] 注册失败:', error);
+      logger.error('注册失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '注册失败',
       });
@@ -130,7 +132,7 @@ router.post(
         email: user.email,
       });
 
-      console.log(`[Auth] 用户登录: ${user.email}`);
+      logger.success('用户登录', { email: user.email });
 
       res.json({
         success: true,
@@ -142,7 +144,7 @@ router.post(
         ...tokens,
       });
     } catch (error) {
-      console.error('[Auth] 登录失败:', error);
+      logger.error('登录失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '登录失败',
       });
@@ -193,7 +195,7 @@ router.post(
         accessToken,
       });
     } catch (error) {
-      console.error('[Auth] Token 刷新失败:', error);
+      logger.error('Token 刷新失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : 'Token 刷新失败',
       });
@@ -219,7 +221,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       user: user.toJSON(),
     });
   } catch (error) {
-    console.error('[Auth] 获取用户信息失败:', error);
+    logger.error('获取用户信息失败', error as Error);
     res.status(500).json({
       error: error instanceof Error ? error.message : '获取用户信息失败',
     });
@@ -267,7 +269,7 @@ router.put(
         user: user.toJSON(),
       });
     } catch (error) {
-      console.error('[Auth] 更新用户信息失败:', error);
+      logger.error('更新用户信息失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '更新用户信息失败',
       });
@@ -313,14 +315,14 @@ router.put(
       user.passwordHash = await hashPassword(newPassword);
       await user.save();
 
-      console.log(`[Auth] 用户修改密码: ${user.email}`);
+      logger.success('用户修改密码', { email: user.email });
 
       res.json({
         success: true,
         message: '密码修改成功',
       });
     } catch (error) {
-      console.error('[Auth] 修改密码失败:', error);
+      logger.error('修改密码失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '修改密码失败',
       });

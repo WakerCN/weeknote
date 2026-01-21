@@ -3,6 +3,9 @@
  */
 
 import mongoose from 'mongoose';
+import { createLogger } from '../logger/index.js';
+
+const logger = createLogger('DB');
 
 /**
  * MongoDB 连接地址
@@ -20,7 +23,7 @@ let isConnected = false;
  */
 export async function connectDB(): Promise<void> {
   if (isConnected) {
-    console.log('[DB] 已连接，跳过重复连接');
+    logger.debug('已连接，跳过重复连接');
     return;
   }
 
@@ -32,21 +35,21 @@ export async function connectDB(): Promise<void> {
     await mongoose.connect(MONGODB_URI);
     isConnected = true;
 
-    console.log('[DB] MongoDB 连接成功');
-    console.log(`[DB] 连接地址: ${MONGODB_URI.replace(/\/\/.*:.*@/, '//*****:*****@')}`);
+    logger.success('MongoDB 连接成功');
+    logger.info(`连接地址: ${MONGODB_URI.replace(/\/\/.*:.*@/, '//*****:*****@')}`);
 
     // 监听连接事件
     mongoose.connection.on('error', (error) => {
-      console.error('[DB] MongoDB 连接错误:', error);
+      logger.error('MongoDB 连接错误', error);
     });
 
     mongoose.connection.on('disconnected', () => {
-      console.log('[DB] MongoDB 连接已断开');
+      logger.warn('MongoDB 连接已断开');
       isConnected = false;
     });
 
   } catch (error) {
-    console.error('[DB] MongoDB 连接失败:', error);
+    logger.error('MongoDB 连接失败', error as Error);
     throw error;
   }
 }
@@ -62,9 +65,9 @@ export async function disconnectDB(): Promise<void> {
   try {
     await mongoose.disconnect();
     isConnected = false;
-    console.log('[DB] MongoDB 已断开连接');
+    logger.info('MongoDB 已断开连接');
   } catch (error) {
-    console.error('[DB] 断开连接失败:', error);
+    logger.error('断开连接失败', error as Error);
     throw error;
   }
 }

@@ -18,6 +18,9 @@ import {
   type ScheduleTime,
   type ChannelSchedules,
 } from '@weeknote/core';
+import { createLogger } from '../logger/index.js';
+
+const logger = createLogger('Scheduler');
 
 /**
  * 默认渠道提醒时间
@@ -99,7 +102,7 @@ export class CloudReminderScheduler {
    */
   start(): void {
     if (this.job) {
-      console.log('[CloudReminder] 调度器已在运行');
+      logger.warn('调度器已在运行');
       return;
     }
 
@@ -109,7 +112,7 @@ export class CloudReminderScheduler {
     });
 
     this.isRunning = true;
-    console.log('[CloudReminder] 定时调度器已启动');
+    logger.success('定时调度器已启动');
   }
 
   /**
@@ -120,7 +123,7 @@ export class CloudReminderScheduler {
       this.job.stop();
       this.job = null;
       this.isRunning = false;
-      console.log('[CloudReminder] 定时调度器已停止');
+      logger.info('定时调度器已停止');
     }
   }
 
@@ -144,7 +147,7 @@ export class CloudReminderScheduler {
     if (!workdayInfo.isWorkday) {
       // 只在整点时输出日志，避免每分钟都输出
       if (minute === 0) {
-        console.log(`[CloudReminder] 今天是${workdayInfo.reason}，跳过提醒`);
+        logger.debug(`今天是${workdayInfo.reason}，跳过提醒`);
       }
       return;
     }
@@ -164,7 +167,7 @@ export class CloudReminderScheduler {
         await this.checkAndSendForUser(user, hour, minute);
       }
     } catch (error) {
-      console.error('[CloudReminder] 查询用户失败:', error);
+      logger.error('查询用户失败', error as Error);
     }
   }
 
@@ -209,15 +212,15 @@ export class CloudReminderScheduler {
     time: ScheduleTime
   ): Promise<void> {
     const scheduleName = time.label || formatTime(time.hour, time.minute);
-    console.log(`[CloudReminder] 触发钉钉「${scheduleName}」(${userEmail})，正在发送...`);
+    logger.info(`触发钉钉「${scheduleName}」`, { email: userEmail });
 
     const { title, content } = generateReminderMessage();
     const result = await sendDingtalkMessage(webhook, title, content, secret);
 
     if (result.success) {
-      console.log(`[CloudReminder] 钉钉「${scheduleName}」(${userEmail}) 推送成功`);
+      logger.success(`钉钉「${scheduleName}」推送成功`, { email: userEmail });
     } else {
-      console.error(`[CloudReminder] 钉钉「${scheduleName}」(${userEmail}) 推送失败:`, result.error);
+      logger.error(`钉钉「${scheduleName}」推送失败`, { email: userEmail, error: result.error });
     }
   }
 
@@ -230,15 +233,15 @@ export class CloudReminderScheduler {
     time: ScheduleTime
   ): Promise<void> {
     const scheduleName = time.label || formatTime(time.hour, time.minute);
-    console.log(`[CloudReminder] 触发 Server酱「${scheduleName}」(${userEmail})，正在发送...`);
+    logger.info(`触发 Server酱「${scheduleName}」`, { email: userEmail });
 
     const { title, content } = generateReminderMessage();
     const result = await sendServerChanMessage(sendKey, title, content);
 
     if (result.success) {
-      console.log(`[CloudReminder] Server酱「${scheduleName}」(${userEmail}) 推送成功`);
+      logger.success(`Server酱「${scheduleName}」推送成功`, { email: userEmail });
     } else {
-      console.error(`[CloudReminder] Server酱「${scheduleName}」(${userEmail}) 推送失败:`, result.error);
+      logger.error(`Server酱「${scheduleName}」推送失败`, { email: userEmail, error: result.error });
     }
   }
 }

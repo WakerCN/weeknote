@@ -17,8 +17,10 @@ import {
   type ServerChanConfig,
   DEFAULT_CHANNEL_SCHEDULES,
 } from '@weeknote/core';
+import { createLogger } from '../logger/index.js';
 
 const router: Router = Router();
+const logger = createLogger('Reminder');
 
 // 所有路由都需要认证
 router.use(authMiddleware);
@@ -143,7 +145,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       config: reminderConfig,
     });
   } catch (error) {
-    console.error('[Reminder] 获取配置失败:', error);
+    logger.error('获取配置失败', error as Error);
     res.status(500).json({
       error: error instanceof Error ? error.message : '获取配置失败',
     });
@@ -261,14 +263,14 @@ router.put(
       user.config.reminderConfig = newReminderConfig as unknown as Record<string, unknown>;
       await user.save();
 
-      console.log(`[Reminder] 更新配置: ${req.user!.email}`);
+      logger.success('更新配置', { email: req.user!.email });
 
       res.json({
         success: true,
         config: newReminderConfig,
       });
     } catch (error) {
-      console.error('[Reminder] 更新配置失败:', error);
+      logger.error('更新配置失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '保存配置失败',
       });
@@ -296,22 +298,22 @@ router.post(
         return;
       }
 
-      console.log(`[Reminder] 发送 Server酱 测试消息: ${req.user!.email}`);
+      logger.info('发送 Server酱 测试消息', { email: req.user!.email });
 
       const result = await sendTestMessage(trimmedKey);
 
       if (result.success) {
-        console.log('[Reminder] Server酱 测试消息发送成功');
+        logger.success('Server酱 测试消息发送成功');
         res.json({ success: true });
       } else {
-        console.error('[Reminder] Server酱 测试消息发送失败:', result.error);
+        logger.error('Server酱 测试消息发送失败', { error: result.error });
         res.status(400).json({
           success: false,
           error: result.error,
         });
       }
     } catch (error) {
-      console.error('[Reminder] Server酱 测试推送失败:', error);
+      logger.error('Server酱 测试推送失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '测试失败',
       });
@@ -339,7 +341,7 @@ router.post(
         return;
       }
 
-      console.log(`[Reminder] 发送钉钉测试消息: ${req.user!.email}`);
+      logger.info('发送钉钉测试消息', { email: req.user!.email });
 
       const result = await sendDingtalkTestMessage(
         trimmedWebhook,
@@ -347,17 +349,17 @@ router.post(
       );
 
       if (result.success) {
-        console.log('[Reminder] 钉钉测试消息发送成功');
+        logger.success('钉钉测试消息发送成功');
         res.json({ success: true });
       } else {
-        console.error('[Reminder] 钉钉测试消息发送失败:', result.error);
+        logger.error('钉钉测试消息发送失败', { error: result.error });
         res.status(400).json({
           success: false,
           error: result.error,
         });
       }
     } catch (error) {
-      console.error('[Reminder] 钉钉测试推送失败:', error);
+      logger.error('钉钉测试推送失败', error as Error);
       res.status(500).json({
         error: error instanceof Error ? error.message : '测试失败',
       });
