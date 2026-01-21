@@ -13,6 +13,9 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  passwordHash?: boolean; // 是否设置了密码
+  loginMethod?: 'password' | 'code';
+  createdAt?: string;
 }
 
 /**
@@ -30,6 +33,18 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
+  /** 发送登录验证码 */
+  sendLoginCode: (email: string) => Promise<void>;
+  /** 验证码登录 */
+  loginWithCode: (email: string, code: string) => Promise<{ isNewUser: boolean }>;
+  /** 发送重置密码验证码 */
+  sendResetCode: (email: string) => Promise<void>;
+  /** 重置密码 */
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<void>;
+  /** 设置密码（验证码用户） */
+  setPassword: (newPassword: string) => Promise<void>;
+  /** 刷新用户信息 */
+  refreshUser: () => Promise<void>;
   /** 注册导航函数（供 Router 组件调用） */
   setNavigate: (navigate: NavigateFunction) => void;
 }
@@ -151,6 +166,94 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * 发送登录验证码
+   */
+  const sendLoginCode = async (email: string) => {
+    try {
+      await apiClient.post('/auth/code/send', { email });
+      toast.success('验证码已发送到您的邮箱');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '发送验证码失败';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  /**
+   * 验证码登录
+   */
+  const loginWithCode = async (email: string, code: string): Promise<{ isNewUser: boolean }> => {
+    try {
+      const response = await apiClient.post('/auth/code/login', { email, code });
+      const { user: userData, accessToken, refreshToken, isNewUser } = response.data;
+
+      // 保存 Token
+      tokenManager.setTokens(accessToken, refreshToken);
+
+      // 设置用户信息
+      setUser(userData);
+
+      toast.success(isNewUser ? '欢迎加入 WeekNote！' : '登录成功');
+      return { isNewUser };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '验证码登录失败';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  /**
+   * 发送重置密码验证码
+   */
+  const sendResetCode = async (email: string) => {
+    try {
+      await apiClient.post('/auth/forgot-password', { email });
+      toast.success('如果该邮箱已注册，验证码已发送');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '发送验证码失败';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  /**
+   * 重置密码
+   */
+  const resetPassword = async (email: string, code: string, newPassword: string) => {
+    try {
+      await apiClient.post('/auth/reset-password', { email, code, newPassword });
+      toast.success('密码重置成功，请使用新密码登录');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '重置密码失败';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  /**
+   * 设置密码（验证码用户）
+   */
+  const setPassword = async (newPassword: string) => {
+    try {
+      await apiClient.put('/auth/set-password', { newPassword });
+      toast.success('密码设置成功');
+      // 刷新用户信息
+      await fetchCurrentUser();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '设置密码失败';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  /**
+   * 刷新用户信息
+   */
+  const refreshUser = async () => {
+    await fetchCurrentUser();
+  };
+
   const value: AuthContextType = {
     user,
     loading,
@@ -158,6 +261,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     register,
     logout,
+    sendLoginCode,
+    loginWithCode,
+    sendResetCode,
+    resetPassword,
+    setPassword,
+    refreshUser,
     setNavigate,
   };
 
