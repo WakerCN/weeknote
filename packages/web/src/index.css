@@ -193,6 +193,43 @@ body {
   animation: fadeIn 0.2s ease-out;
 }
 
+/* 弹窗从鼠标位置弹出的动画 */
+@keyframes dialog-enter-from-mouse {
+  0% {
+    opacity: 0;
+    transform: translate(
+      calc(-50% + var(--origin-x, 0px)),
+      calc(-50% + var(--origin-y, 0px))
+    ) scale(0.6);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.dialog-from-mouse {
+  animation: dialog-enter-from-mouse 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform: translate(-50%, -50%) scale(1); /* 确保动画结束后的最终状态 */
+}
+
+/* 默认弹窗打开动画（无鼠标位置时） */
+@keyframes dialog-default-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.dialog-default-open {
+  animation: dialog-default-enter 0.2s ease-out forwards;
+  transform: translate(-50%, -50%) scale(1);
+}
+
 /* View Transitions API - 页面切换动画 */
 
 /* 设置页面右侧内容区域的过渡标识 */
