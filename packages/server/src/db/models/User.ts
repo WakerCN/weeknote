@@ -25,15 +25,21 @@ export interface IUserConfig {
 }
 
 /**
+ * 登录方式类型
+ */
+export type LoginMethod = 'password' | 'code';
+
+/**
  * 用户文档接口
  */
 export interface IUser extends Document {
   _id: mongoose.Types.ObjectId;
   email: string;
-  passwordHash: string;
+  passwordHash?: string; // 可选：验证码登录用户可以没有密码
   name: string;
   avatar?: string;
   config: IUserConfig;
+  loginMethod?: LoginMethod; // 记录注册方式
   createdAt: Date;
   updatedAt: Date;
   lastLoginAt?: Date;
@@ -79,7 +85,7 @@ const UserSchema = new Schema<IUser, IUserModel>(
     },
     passwordHash: {
       type: String,
-      required: [true, '密码不能为空'],
+      required: false, // 改为可选：验证码登录用户可以没有密码
     },
     name: {
       type: String,
@@ -97,6 +103,11 @@ const UserSchema = new Schema<IUser, IUserModel>(
     },
     lastLoginAt: {
       type: Date,
+    },
+    loginMethod: {
+      type: String,
+      enum: ['password', 'code'],
+      default: 'password',
     },
   },
   {

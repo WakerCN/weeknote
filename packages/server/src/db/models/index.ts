@@ -4,7 +4,15 @@
 
 // 用户模型
 export { User } from './User.js';
-export type { IUser, IUserModel, IUserConfig, IApiKeys } from './User.js';
+export type { IUser, IUserModel, IUserConfig, IApiKeys, LoginMethod } from './User.js';
+
+// 验证码模型
+export { VerificationCode } from './VerificationCode.js';
+export type {
+  IVerificationCode,
+  IVerificationCodeModel,
+  VerificationCodeType,
+} from './VerificationCode.js';
 
 // 每日记录模型
 export { DailyLog } from './DailyLog.js';
