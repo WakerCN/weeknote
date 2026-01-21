@@ -18,12 +18,17 @@ import {
   getHistoryList,
   deleteHistory,
   type GenerationHistoryItem,
+  type Platform,
 } from '../api';
 import { useConfirm } from './ui/confirm-dialog';
+import VolcengineLogo from '../assets/logos/volcengine.svg';
+import DeepSeekLogo from '../assets/logos/deepseek.svg';
+import OpenAILogo from '../assets/logos/openai.svg';
 
 /** 正在生成的临时项信息 */
 export interface GeneratingItem {
   dateRangeLabel: string;
+  modelId: string;
   modelName: string;
 }
 
@@ -45,6 +50,31 @@ export interface HistorySidebarRef {
   /** 刷新历史列表 */
   refresh: () => void;
 }
+
+/** 根据模型 ID 获取平台 */
+function getPlatform(modelId: string): Platform {
+  if (modelId.startsWith('siliconflow/')) return 'siliconflow';
+  if (modelId.startsWith('deepseek/')) return 'deepseek';
+  if (modelId.startsWith('doubao/')) return 'doubao';
+  return 'openai';
+}
+
+/** 平台 Logo 图标组件 */
+const PlatformLogo = ({ platform, className = 'w-3.5 h-3.5' }: { platform: Platform; className?: string }) => {
+  const logos: Record<Platform, React.ReactNode> = {
+    doubao: <img src={VolcengineLogo} alt="火山方舟" className={className} />,
+    deepseek: <img src={DeepSeekLogo} alt="DeepSeek" className={className} />,
+    openai: <img src={OpenAILogo} alt="OpenAI" className={className} />,
+    siliconflow: (
+      <img 
+        src="https://cloud.siliconflow.cn/favicon.ico" 
+        alt="硅基流动" 
+        className={className}
+      />
+    ),
+  };
+  return <>{logos[platform]}</>;
+};
 
 /** 格式化相对时间 */
 function formatRelativeTime(dateStr: string): string {
@@ -234,8 +264,9 @@ export const HistorySidebar = forwardRef<HistorySidebarRef, HistorySidebarProps>
             </div>
 
             {/* 模型信息 */}
-            <div className="mt-1 text-xs text-[#8b949e] truncate">
-              🤖 {generatingItem.modelName}
+            <div className="mt-1 text-xs text-[#8b949e] truncate flex items-center gap-1">
+              <PlatformLogo platform={getPlatform(generatingItem.modelId)} />
+              <span>{generatingItem.modelName}</span>
             </div>
 
             {/* 时间 */}
@@ -270,6 +301,12 @@ export const HistorySidebar = forwardRef<HistorySidebarRef, HistorySidebarProps>
               <div className="flex items-center gap-1.5 text-sm font-medium text-[#f0f6fc]">
                 <span>📅</span>
                 <span>{history.dateRangeLabel}</span>
+                {/* 导入标识 */}
+                {history.dateStart && history.dateEnd && (
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-blue-500/20 text-blue-400">
+                    导入
+                  </span>
+                )}
                 {/* 手动输入标识 */}
                 {!history.dateStart && history.dateRangeLabel !== '手动输入' && (
                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400">
@@ -279,8 +316,9 @@ export const HistorySidebar = forwardRef<HistorySidebarRef, HistorySidebarProps>
               </div>
 
               {/* 模型信息 */}
-              <div className="mt-1 text-xs text-[#8b949e] truncate">
-                🤖 {history.modelName}
+              <div className="mt-1 text-xs text-[#8b949e] truncate flex items-center gap-1">
+                <PlatformLogo platform={getPlatform(history.modelId)} />
+                <span>{history.modelName}</span>
               </div>
 
               {/* 时间 + 菜单 */}

@@ -366,7 +366,7 @@ export default function Home() {
       const dateRangeLabel = dateRange 
         ? `${dateRange.startDate.slice(5)} ~ ${dateRange.endDate.slice(5)}`
         : '手动输入';
-      setGeneratingItem({ dateRangeLabel, modelName });
+      setGeneratingItem({ dateRangeLabel, modelId: selectedModelId, modelName });
       
       // DeepSeek R1 不支持禁用思考，始终为 enabled
       const isDeepSeekR1 = selectedModelId === 'deepseek/deepseek-reasoner';
