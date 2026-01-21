@@ -2,21 +2,43 @@
  * 日志核心实现
  */
 
-import { createConsola } from 'consola';
 import { getLogConfig, LOG_LEVEL_PRIORITY } from './config.js';
 import { getRequestId } from './request-context.js';
 import { getFileTransport } from './file-transport.js';
 import type { BoxOptions, LogLevel, LogMeta } from './types.js';
 
-// 日志级别 emoji（某些 emoji 后加空格确保显示宽度一致为 2）
-const LEVEL_EMOJIS: Record<string, string> = {
-  debug: '🔍',
-  info: 'ℹ️ ',   // U+2139 显示宽度只有 1，补一个空格
-  success: '✅',
-  warn: '⚠️ ',   // U+26A0 显示宽度只有 1，补一个空格
-  error: '❌',
-  start: '🚀',
-  ready: '🎯',
+// ANSI 颜色代码
+const colors = {
+  reset: '\x1b[0m',
+  dim: '\x1b[2m',
+  bold: '\x1b[1m',
+  // 前景色
+  gray: '\x1b[90m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+  white: '\x1b[37m',
+  // 亮色
+  brightRed: '\x1b[91m',
+  brightGreen: '\x1b[92m',
+  brightYellow: '\x1b[93m',
+  brightBlue: '\x1b[94m',
+  brightMagenta: '\x1b[95m',
+  brightCyan: '\x1b[96m',
+};
+
+// 日志级别配置：标签 + 颜色
+const LEVEL_CONFIG: Record<string, { label: string; color: string }> = {
+  debug: { label: 'DEBUG', color: colors.gray },
+  info: { label: 'INFO ', color: colors.cyan },
+  success: { label: 'OK   ', color: colors.green },
+  warn: { label: 'WARN ', color: colors.yellow },
+  error: { label: 'ERROR', color: colors.red },
+  start: { label: 'START', color: colors.magenta },
+  ready: { label: 'READY', color: colors.brightGreen },
 };
 
 // 日志级别颜色（用于生产环境 JSON）
@@ -108,32 +130,29 @@ function formatModule(module: string): string {
  */
 export function createLogger(module: string) {
   const config = getLogConfig();
+  const useColors = !config.isCI && !config.isProduction;
 
-  // Consola 日志级别映射（consola: 数字越大越详细）
-  const CONSOLA_LEVEL_MAP: Record<LogLevel, number> = {
-    error: 0,
-    warn: 1,
-    info: 3,
-    debug: 4,
-  };
-
-  // 创建 consola 实例
-  const consola = createConsola({
-    level: CONSOLA_LEVEL_MAP[config.level],
-    formatOptions: {
-      colors: !config.isCI && !config.isProduction,
-      date: false,
-    },
-  });
+  /**
+   * 应用颜色（仅开发环境）
+   */
+  function colorize(text: string, color: string): string {
+    return useColors ? `${color}${text}${colors.reset}` : text;
+  }
 
   /**
    * 格式化日志消息
+   * 格式: LEVEL │ HH:MM:SS │ MODULE     │ [REQ_ID] 消息 {元数据}
+   * 当没有请求ID时: LEVEL │ HH:MM:SS │ MODULE     │ 消息 {元数据}
    */
-  function formatMessage(levelEmoji: string, message: string, meta?: LogMeta): string {
+  function formatMessage(
+    level: string,
+    message: string,
+    meta?: LogMeta
+  ): string {
+    const { label, color } = LEVEL_CONFIG[level];
     const time = formatTime();
     const mod = formatModule(module);
     const requestId = meta?.requestId || getRequestId();
-    const ridPart = requestId ? `[${requestId}] ` : '';
 
     // 过滤掉 requestId 后的其他 meta
     const otherMeta = meta ? { ...meta } : {};
@@ -141,11 +160,23 @@ export function createLogger(module: string) {
 
     const metaStr =
       Object.keys(otherMeta).length > 0
-        ? ' ' + JSON.stringify(otherMeta)
+        ? ` ${colors.dim}${JSON.stringify(otherMeta)}${colors.reset}`
         : '';
 
-    // 格式: [时间] [模块] [请求ID] emoji 消息 {元数据}
-    return `[${time}] [${mod}] ${ridPart}${levelEmoji} ${message}${metaStr}`;
+    // 构建各部分
+    const levelPart = colorize(label, color);
+    const timePart = colorize(time, colors.dim);
+    const modPart = colorize(mod, colors.brightCyan);
+    // 请求ID作为消息前缀，只在有值时显示
+    const ridPrefix = requestId
+      ? colorize(`[${requestId}] `, colors.dim)
+      : '';
+    const msgPart = colorize(message, color);
+
+    // 分隔符
+    const sep = colorize('│', colors.dim);
+
+    return `${levelPart} ${sep} ${timePart} ${sep} ${modPart} ${sep} ${ridPrefix}${msgPart}${metaStr}`;
   }
 
   /**
@@ -175,7 +206,6 @@ export function createLogger(module: string) {
     message: string,
     metaOrError?: LogMeta | Error
   ): void {
-    const levelEmoji = LEVEL_EMOJIS[level];
     const fileLevel = LEVEL_MAP[level];
 
     let meta: LogMeta = {};
@@ -208,15 +238,18 @@ export function createLogger(module: string) {
       };
       console.log(JSON.stringify(jsonLog));
     } else {
-      // 开发环境：彩色格式
-      const formatted = formatMessage(levelEmoji, message, meta);
-      (consola[level] as (msg: string) => void)(formatted);
+      // 开发环境：表格式格式
+      const formatted = formatMessage(level, message, meta);
+      console.log(formatted);
 
       // 错误堆栈单独输出
       if (errorStack && level === 'error') {
         const stackLines = errorStack.split('\n').slice(1, 4);
+        const indent = '      │          │            │ ';
         stackLines.forEach((line) => {
-          console.log(`           └─${line.trim()}`);
+          console.log(
+            colorize(`${indent}└─ ${line.trim()}`, colors.dim)
+          );
         });
       }
     }
@@ -259,26 +292,29 @@ export function createLogger(module: string) {
       const empty = ' '.repeat(width);
 
       console.log('');
-      console.log(`┌${border}┐`);
-      console.log(`│${empty}│`);
-      console.log(`│  ${padEndByWidth(options.title, width - 2)}│`);
-      console.log(`│${empty}│`);
+      console.log(colorize(`┌${border}┐`, colors.cyan));
+      console.log(colorize(`│${empty}│`, colors.cyan));
+      console.log(
+        colorize('│', colors.cyan) +
+          `  ${padEndByWidth(options.title, width - 2)}` +
+          colorize('│', colors.cyan)
+      );
+      console.log(colorize(`│${empty}│`, colors.cyan));
 
       if (options.lines) {
         options.lines.forEach((line) => {
-          console.log(`│  ${padEndByWidth(line, width - 2)}│`);
+          console.log(
+            colorize('│', colors.cyan) +
+              `  ${padEndByWidth(line, width - 2)}` +
+              colorize('│', colors.cyan)
+          );
         });
-        console.log(`│${empty}│`);
+        console.log(colorize(`│${empty}│`, colors.cyan));
       }
 
-      console.log(`└${border}┘`);
+      console.log(colorize(`└${border}┘`, colors.cyan));
       console.log('');
     },
-
-    /**
-     * 原始 consola 实例（用于特殊场景）
-     */
-    raw: consola,
   };
 }
 
