@@ -87,7 +87,7 @@ export function generateReminderMessage(): { title: string; content: string } {
 
   return {
     title: '📝 WeekNote 填写提醒',
-    content: `Hi，现在是 **${time}**，${date} ${weekday}\n\n别忘了记录今天的工作内容哦！\n\n> 👉 [点击填写工作日志](http://localhost:3000/daily)`,
+    content: `Hi，现在是 **${time}**，${date} ${weekday}\n\n别忘了记录今天的工作内容哦！\n\n> 👉 [点击填写工作日志](http://localhost:5173/daily)`,
   };
 }
 
