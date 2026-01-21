@@ -38,6 +38,9 @@ export default function DailyLog() {
   // 导出范围内的记录统计
   const [exportFilledDays, setExportFilledDays] = useState<number | undefined>(undefined);
   
+  // 日历刷新触发器
+  const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
+  
   // 仅在"切换日期"时展示右侧模糊遮罩
   const [isSwitchingDate, setIsSwitchingDate] = useState(false);
   const dateSwitchRef = useRef<{ target: string | null; sawLoading: boolean }>({
@@ -108,18 +111,16 @@ export default function DailyLog() {
 
   // 保存记录
   const handleSave = async (date: string, params: SaveDayRecordParams) => {
-    try {
-      await saveDay(date, params);
-      if (date === selectedDate) {
-        await refreshRecord();
-      }
-      // 如果保存的日期在导出范围内，刷新统计
-      if (date >= exportStartDate && date <= exportEndDate) {
-        loadExportStats();
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : '保存失败');
-      throw error;
+    // 注意：错误 toast 已由 api-client 统一处理，这里无需重复调用
+    await saveDay(date, params);
+    if (date === selectedDate) {
+      await refreshRecord();
+    }
+    // 刷新日历状态
+    setCalendarRefreshKey((prev) => prev + 1);
+    // 如果保存的日期在导出范围内，刷新统计
+    if (date >= exportStartDate && date <= exportEndDate) {
+      loadExportStats();
     }
   };
 
@@ -205,10 +206,11 @@ export default function DailyLog() {
       {/* 主内容区 */}
       <main className="flex-1 flex overflow-hidden">
         {/* 左侧：日历 */}
-        <div className="w-72 flex-shrink-0">
+        <div className="w-[380px] flex-shrink-0">
           <Calendar
             selectedDate={selectedDate}
             onSelectDate={handleSelectDate}
+            refreshKey={calendarRefreshKey}
           />
         </div>
 
