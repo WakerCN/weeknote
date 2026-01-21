@@ -90,15 +90,6 @@ router.post(
       // 自动计算 dayOfWeek，如果前端没传的话
       const dayOfWeek = req.body.dayOfWeek || getDayOfWeek(date);
 
-      // 验证日期不能是未来
-      const dateObj = new Date(date);
-      const today = new Date();
-      today.setHours(23, 59, 59, 999);
-      if (dateObj > today) {
-        res.status(400).json({ error: '不能记录未来的日期' });
-        return;
-      }
-
       // 使用 findOneAndUpdate 实现 upsert（插入或更新）
       const record = await DailyLog.findOneAndUpdate(
         { userId, date },
