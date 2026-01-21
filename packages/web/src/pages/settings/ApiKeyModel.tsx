@@ -454,14 +454,16 @@ export default function ApiKeyModel() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* 页面头部 */}
-      <header className="h-14 flex items-center px-6 bg-[#161b22] border-b border-[#30363d] shrink-0">
-        <h2 className="text-lg font-semibold text-[#f0f6fc]">模型与 API Key</h2>
-      </header>
-
       {/* 主内容区 */}
-      <main className="flex-1 overflow-auto p-6">
-        <div className="max-w-3xl space-y-8">
+      <main className="flex-1 overflow-auto p-6 pb-20">
+        <div className="max-w-3xl space-y-6">
+          {/* 页面标题 */}
+          <div>
+            <h2 className="text-xl font-semibold text-[#f0f6fc]">🤖 模型与 API Key</h2>
+            <p className="text-sm text-[#8b949e] mt-1">
+              配置 AI 服务平台的 API Key 和默认模型
+            </p>
+          </div>
           {/* API Keys 配置 */}
           <section className="bg-[#161b22] rounded-lg border border-[#30363d] p-6">
             <h3 className="text-base font-semibold text-[#f0f6fc] mb-2">API Keys</h3>

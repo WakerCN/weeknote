@@ -180,22 +180,9 @@ export default function PromptSettings() {
 
   return (
     <div className="h-full flex flex-col">
-      <header className="h-14 flex items-center justify-between px-6 bg-[#161b22] border-b border-[#30363d] shrink-0">
-        <h2 className="text-lg font-semibold text-[#f0f6fc]">Prompt 模板</h2>
-        {!isCreating && selectedId && !isActive && (
-          <button
-            onClick={handleActivate}
-            disabled={activating}
-            className="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-[#21262d] text-[#f0f6fc] hover:bg-[#30363d] border border-[#30363d]"
-          >
-            {activating ? '激活中...' : '设为默认'}
-          </button>
-        )}
-      </header>
-
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧模板列表 */}
-        <aside className="w-60 ml-4 my-4 bg-[#161b22] border border-[#30363d] rounded-lg flex flex-col shrink-0 overflow-hidden">
+        <aside className="w-60 ml-6 my-6 bg-[#161b22] border border-[#30363d] rounded-lg flex flex-col shrink-0 overflow-hidden">
           <div className="p-4 border-b border-[#30363d]">
             <button
               onClick={handleStartCreate}
@@ -247,8 +234,27 @@ export default function PromptSettings() {
         </aside>
 
         {/* 右侧编辑区 */}
-        <main className="flex-1 overflow-auto p-4 pb-20">
+        <main className="flex-1 overflow-auto p-6 pb-20">
           <div className="max-w-3xl space-y-6">
+            {/* 页面标题 */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-[#f0f6fc]">✍️ Prompt 模板</h2>
+                <p className="text-sm text-[#8b949e] mt-1">
+                  管理周报生成的提示词模板
+                </p>
+              </div>
+              {!isCreating && selectedId && !isActive && (
+                <button
+                  onClick={handleActivate}
+                  disabled={activating}
+                  className="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-[#21262d] text-[#f0f6fc] hover:bg-[#30363d] border border-[#30363d]"
+                >
+                  {activating ? '激活中...' : '设为默认'}
+                </button>
+              )}
+            </div>
+
             <SettingsCard>
               <SettingsCardHeader title="基本信息" />
               <div className="space-y-4">

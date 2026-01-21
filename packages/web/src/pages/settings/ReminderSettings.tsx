@@ -381,12 +381,16 @@ export default function ReminderSettings() {
 
   return (
     <div className="h-full flex flex-col">
-      <header className="h-14 flex items-center px-6 bg-[#161b22] border-b border-[#30363d] shrink-0">
-        <h2 className="text-lg font-semibold text-[#f0f6fc]">提醒设置</h2>
-      </header>
-
       <main className="flex-1 overflow-auto p-6 pb-20">
         <div className="max-w-3xl space-y-6">
+          {/* 页面标题 */}
+          <div>
+            <h2 className="text-xl font-semibold text-[#f0f6fc]">🔔 提醒设置</h2>
+            <p className="text-sm text-[#8b949e] mt-1">
+              配置日志填写提醒，支持多渠道推送
+            </p>
+          </div>
+
           {/* 启用提醒 */}
           <SettingsCard>
             <div className="flex items-center justify-between">
