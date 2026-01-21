@@ -308,7 +308,7 @@ export const HistorySidebar = forwardRef<HistorySidebarRef, HistorySidebarProps>
                   </span>
                 )}
                 {/* 手动输入标识 */}
-                {!history.dateStart && history.dateRangeLabel !== '手动输入' && (
+                {!history.dateStart && !history.dateEnd && history.dateRangeLabel === '手动输入' && (
                   <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400">
                     手动
                   </span>
