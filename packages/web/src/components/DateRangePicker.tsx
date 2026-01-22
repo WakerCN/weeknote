@@ -8,7 +8,6 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-reac
 import {
   formatLocalDate,
   parseLocalDate,
-  formatShortDate,
   getWeekStart,
   getWeekEnd,
   getLastWeekStart,
@@ -17,6 +16,7 @@ import {
   getMonthEnd,
   getDaysAgo,
   getDayCount,
+  formatShortDateWithYear,
 } from '@/lib/date-utils';
 
 interface DateRangePickerProps {
@@ -180,6 +180,15 @@ function MonthPanel({
   );
 }
 
+/**
+ * 验证日期字符串格式是否为 YYYY-MM-DD
+ */
+function isValidDateString(dateStr: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return false;
+  const d = parseLocalDate(dateStr);
+  return !isNaN(d.getTime());
+}
+
 export default function DateRangePicker({
   startDate,
   endDate,
@@ -193,11 +202,22 @@ export default function DateRangePicker({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [pickerPosition, setPickerPosition] = useState({ x: 0, y: 0, openUpward: false });
   
+  // 输入框状态
+  const [inputStartDate, setInputStartDate] = useState(startDate);
+  const [inputEndDate, setInputEndDate] = useState(endDate);
+  const [inputError, setInputError] = useState<string | null>(null);
+  
   // 当前显示的月份（左侧面板）
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = startDate ? parseLocalDate(startDate) : new Date();
     return { year: d.getFullYear(), month: d.getMonth() + 1 };
   });
+  
+  // 同步外部 props 到输入框
+  useEffect(() => {
+    setInputStartDate(startDate);
+    setInputEndDate(endDate);
+  }, [startDate, endDate]);
 
   // 右侧面板的月份
   const nextMonth = useMemo(() => {
@@ -237,7 +257,39 @@ export default function DateRangePicker({
     setTempStartDate(null);
     setSelectingStart(true);
     setHoverDate(null);
+    setInputStartDate(startDate);
+    setInputEndDate(endDate);
+    setInputError(null);
     setIsOpen(true);
+  };
+
+  // 处理输入框确认
+  const handleInputConfirm = () => {
+    // 验证格式
+    if (!isValidDateString(inputStartDate)) {
+      setInputError('开始日期格式错误，请使用 YYYY-MM-DD 格式');
+      return;
+    }
+    if (!isValidDateString(inputEndDate)) {
+      setInputError('结束日期格式错误，请使用 YYYY-MM-DD 格式');
+      return;
+    }
+    
+    // 确保开始日期不晚于结束日期
+    const [start, end] = inputStartDate <= inputEndDate 
+      ? [inputStartDate, inputEndDate] 
+      : [inputEndDate, inputStartDate];
+    
+    onChange(start, end);
+    setInputError(null);
+    setIsOpen(false);
+  };
+
+  // 处理输入框键盘事件
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleInputConfirm();
+    }
   };
 
   // 处理日期点击
@@ -330,9 +382,9 @@ export default function DateRangePicker({
         className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#21262d] text-[#f0f6fc] hover:bg-[#30363d] transition-colors text-sm"
       >
         <CalendarIcon className="w-4 h-4 text-[#8b949e]" />
-        <span>{formatShortDate(startDate)}</span>
+        <span>{formatShortDateWithYear(startDate)}</span>
         <span className="text-[#8b949e]">~</span>
-        <span>{formatShortDate(endDate)}</span>
+        <span>{formatShortDateWithYear(endDate)}</span>
       </button>
 
       {/* 统计信息 */}
@@ -357,6 +409,46 @@ export default function DateRangePicker({
             }
             onMouseLeave={handleMouseLeave}
           >
+            {/* 日期输入区域 */}
+            <div className="flex items-center gap-2 mb-3 pb-3 border-b border-[#30363d]">
+              <input
+                type="text"
+                value={inputStartDate}
+                onChange={(e) => {
+                  setInputStartDate(e.target.value);
+                  setInputError(null);
+                }}
+                onKeyDown={handleInputKeyDown}
+                placeholder="开始日期"
+                className="w-[110px] px-2 py-1.5 text-sm bg-[#0d1117] border border-[#30363d] rounded-md text-[#f0f6fc] placeholder-[#484f58] focus:border-emerald-500 focus:outline-none"
+              />
+              <span className="text-[#8b949e]">~</span>
+              <input
+                type="text"
+                value={inputEndDate}
+                onChange={(e) => {
+                  setInputEndDate(e.target.value);
+                  setInputError(null);
+                }}
+                onKeyDown={handleInputKeyDown}
+                placeholder="结束日期"
+                className="w-[110px] px-2 py-1.5 text-sm bg-[#0d1117] border border-[#30363d] rounded-md text-[#f0f6fc] placeholder-[#484f58] focus:border-emerald-500 focus:outline-none"
+              />
+              <button
+                onClick={handleInputConfirm}
+                className="px-3 py-1.5 text-xs font-medium bg-emerald-500 text-white rounded-md hover:bg-emerald-400 transition-colors"
+              >
+                确定
+              </button>
+            </div>
+            
+            {/* 输入错误提示 */}
+            {inputError && (
+              <div className="text-xs text-red-400 mb-2 text-center">
+                {inputError}
+              </div>
+            )}
+
             {/* 头部：月份切换 */}
             <div className="flex items-center justify-between mb-3">
               <button
@@ -383,7 +475,7 @@ export default function DateRangePicker({
 
             {/* 提示文字 */}
             <div className="text-xs text-[#8b949e] text-center mb-3">
-              {selectingStart ? '请选择开始日期' : '请选择结束日期'}
+              {selectingStart ? '点击选择开始日期，或直接输入' : '点击选择结束日期'}
             </div>
 
             {/* 双月日历面板 */}
