@@ -256,6 +256,67 @@ const listItemBackspacePlugin = $prose(() => {
 });
 
 /**
+ * 链接边缘输入优化插件
+ * 
+ * 问题：在链接文字的开头或结尾输入时，新输入的字符会被包含在链接中
+ * 解决：检测光标是否在链接 mark 的边缘，如果是则清除 storedMarks 中的链接 mark
+ */
+const linkBoundaryPlugin = $prose(() => {
+  return new Plugin({
+    key: new PluginKey('link-boundary'),
+    props: {
+      handleTextInput(view, from, to) {
+        const { state } = view;
+        const { schema } = state;
+        const linkMark = schema.marks.link;
+        
+        if (!linkMark) return false;
+        
+        // 只处理光标位置（非范围选区）
+        if (from !== to) return false;
+        
+        const $pos = state.doc.resolve(from);
+        
+        // 获取当前位置的 marks
+        const marks = $pos.marks();
+        const hasLink = marks.some((m: { type: typeof linkMark }) => m.type === linkMark);
+        
+        if (!hasLink) return false;
+        
+        // 检查是否在链接边缘
+        // 在开头：前一个位置没有链接 mark
+        let isAtStart = false;
+        if ($pos.parentOffset === 0) {
+          isAtStart = true;
+        } else if (from > 1) {
+          const prevMarks = state.doc.resolve(from - 1).marks();
+          isAtStart = !prevMarks.some((m: { type: typeof linkMark }) => m.type === linkMark);
+        }
+        
+        // 在结尾：后一个位置没有链接 mark
+        let isAtEnd = false;
+        if ($pos.parentOffset === $pos.parent.content.size) {
+          isAtEnd = true;
+        } else if (from < state.doc.content.size - 1) {
+          const nextMarks = state.doc.resolve(from + 1).marks();
+          isAtEnd = !nextMarks.some((m: { type: typeof linkMark }) => m.type === linkMark);
+        }
+        
+        // 如果在边缘，清除链接 mark
+        if (isAtStart || isAtEnd) {
+          // 获取当前所有 marks，移除链接 mark
+          const newMarks = marks.filter((m: { type: typeof linkMark }) => m.type !== linkMark);
+          const tr = state.tr.setStoredMarks(newMarks);
+          view.dispatch(tr);
+        }
+        
+        return false; // 返回 false 让默认行为继续
+      },
+    },
+  });
+});
+
+/**
  * 清理 Markdown 中的 <br /> 标签
  * Milkdown 在某些情况下会将换行序列化为 <br /> 标签，这里统一转换为换行符
  */
@@ -327,7 +388,8 @@ export const MilkdownEditor = forwardRef<MilkdownEditorRef, MilkdownEditorProps>
       crepe.editor
         .use(createTaskListInputRulePlugin)  // [] 转任务列表
         .use(disableHardbreakPlugin)         // 禁用 Shift+Enter 的 hardbreak，避免 <br /> 问题
-        .use(listItemBackspacePlugin);       // 优化空列表项的 Backspace 行为
+        .use(listItemBackspacePlugin)        // 优化空列表项的 Backspace 行为
+        .use(linkBoundaryPlugin);            // 链接边缘输入优化
 
       // 创建编辑器并设置事件监听
       crepe.create().then(() => {
