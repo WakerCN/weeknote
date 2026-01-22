@@ -190,6 +190,9 @@ export const HistorySidebar = forwardRef<HistorySidebarRef, HistorySidebarProps>
 
   // 删除确认处理
   const handleDeleteConfirm = async (id: string) => {
+    // 先关闭菜单，避免确认弹窗关闭后事件穿透
+    setMenuOpenId(null);
+    
     const confirmed = await confirm({
       title: '删除历史记录',
       description: '确定要删除这条历史记录吗？此操作不可撤销。',
@@ -200,7 +203,6 @@ export const HistorySidebar = forwardRef<HistorySidebarRef, HistorySidebarProps>
     if (confirmed) {
       handleDelete(id);
     }
-    setMenuOpenId(null);
   };
 
   // 折叠状态
@@ -353,7 +355,8 @@ export const HistorySidebar = forwardRef<HistorySidebarRef, HistorySidebarProps>
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           handleDeleteConfirm(history._id);
                         }}
                         disabled={deleting}
