@@ -4,16 +4,11 @@
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Save } from 'lucide-react';
+import { ChevronRight, Save } from 'lucide-react';
 import type { DailyRecord, SaveDayRecordParams } from '../api';
 import MilkdownEditor from './MilkdownEditor';
 import { useAutoSave } from './useAutoSave';
-
-// 格式化日期显示 "12月23日"
-const formatDateChinese = (date: string): string => {
-  const d = new Date(date);
-  return `${d.getMonth() + 1}月${d.getDate()}日`;
-};
+import { formatFullDateChinese } from '@/lib/date-utils';
 
 // 四个字段的类型
 interface EditorValues {
@@ -56,18 +51,31 @@ function EditorSection({
   readOnly = false,
 }: EditorSectionProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  // 追踪是否曾经展开过（用于延迟初始化编辑器，提升性能）
+  const [hasExpanded, setHasExpanded] = useState(defaultExpanded);
+
+  const handleToggle = () => {
+    if (!expanded && !hasExpanded) {
+      setHasExpanded(true);
+    }
+    setExpanded(!expanded);
+  };
 
   return (
-    <div className="bg-[#161b22] rounded-lg border border-[#30363d] flex flex-col min-[1920px]:min-h-[280px]">
+    <div
+      className={`rounded-lg bg-[#161b22] border border-[#30363d] overflow-hidden transition-all duration-300 ease-out flex flex-col ${
+        expanded ? 'min-[1920px]:min-h-[280px]' : ''
+      }`}
+    >
       <button
-        onClick={() => setExpanded(!expanded)}
-        className={`w-full flex items-center gap-2 px-4 py-3 bg-[#21262d] hover:bg-[#30363d] transition-colors text-left flex-shrink-0 ${expanded ? 'rounded-t-lg' : 'rounded-lg'}`}
+        onClick={handleToggle}
+        className="w-full flex items-center gap-2 px-4 py-3 bg-[#21262d] hover:bg-[#30363d] transition-colors text-left flex-shrink-0"
       >
-        {expanded ? (
-          <ChevronDown className="w-4 h-4 text-[#8b949e]" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-[#8b949e]" />
-        )}
+        <ChevronRight
+          className={`w-4 h-4 text-[#8b949e] transition-transform duration-300 ${
+            expanded ? 'rotate-90' : ''
+          }`}
+        />
         <span className="text-lg">{icon}</span>
         <h3 className="text-[#f0f6fc] font-medium">{title}</h3>
         {!expanded && value.trim() && (
@@ -77,19 +85,28 @@ function EditorSection({
         )}
       </button>
 
-      {expanded && (
-        <div className="p-3 flex-1 flex flex-col">
-          <MilkdownEditor
-            key={editorKey}
-            defaultValue={value}
-            onChange={onChange}
-            placeholder={placeholder}
-            readOnly={readOnly}
-            minHeight="100px"
-            className="flex-1"
-          />
+      {/* 使用 grid 动画实现平滑展开/收起 */}
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-out flex-1 ${
+          expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden flex flex-col min-h-0">
+          {hasExpanded && (
+            <div className="p-3 flex-1 flex flex-col min-h-0">
+              <MilkdownEditor
+                key={editorKey}
+                defaultValue={value}
+                onChange={onChange}
+                placeholder={placeholder}
+                readOnly={readOnly}
+                minHeight="100px"
+                className="flex-1"
+              />
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -106,6 +123,8 @@ export default function DayEditor({
   const [initialValues, setInitialValues] = useState<EditorValues>(EMPTY_VALUES);
   const [editorVersion, setEditorVersion] = useState(0);
   const [blurActive, setBlurActive] = useState(false);
+  // 是否完成首次数据加载（避免首次加载时显示空编辑器导致闪烁）
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // 追踪是否用户正在编辑（避免服务器数据覆盖用户输入）
   const isEditingRef = useRef(false);
@@ -156,7 +175,13 @@ export default function DayEditor({
 
     setValues(newValues);
     setInitialValues(newValues);
-    setEditorVersion((v) => v + 1);
+    
+    // 只有在已初始化后才递增版本（避免首次加载时多次重建编辑器）
+    if (isInitialized) {
+      setEditorVersion((v) => v + 1);
+    } else {
+      setIsInitialized(true);
+    }
 
     // 延迟标记初始化完成，避免编辑器 onChange 触发误判
     const t = setTimeout(() => {
@@ -164,7 +189,7 @@ export default function DayEditor({
     }, 80);
 
     return () => clearTimeout(t);
-  }, [record, date, loading]);
+  }, [record, date, loading, isInitialized]);
 
   // ===== 毛玻璃遮罩 =====
   useEffect(() => {
@@ -208,7 +233,7 @@ export default function DayEditor({
       {/* 头部 */}
       <div className="p-4 border-b border-[#30363d] flex items-center justify-between">
         <h2 className="text-lg font-semibold text-[#f0f6fc]">
-          {formatDateChinese(date)} {dayOfWeek}
+          {formatFullDateChinese(date)} {dayOfWeek}
         </h2>
 
         <div className="flex items-center gap-3">
@@ -281,21 +306,42 @@ export default function DayEditor({
           }`}
         />
 
-        {/* 响应式网格布局：窄屏单列，宽屏(>=1920px) 2x2 */}
-        <div className="grid grid-cols-1 min-[1920px]:grid-cols-2 gap-4">
-          {sections.map(({ field, title, icon, placeholder }) => (
-            <EditorSection
-              key={field}
-              title={title}
-              icon={icon}
-              value={values[field]}
-              onChange={(v) => handleChange(field, v)}
-              placeholder={placeholder}
-              editorKey={editorKey}
-              readOnly={loading}
-            />
-          ))}
-        </div>
+        {/* 首次加载完成前显示骨架屏 */}
+        {!isInitialized ? (
+          <div className="grid grid-cols-1 min-[1920px]:grid-cols-2 gap-4">
+            {sections.map(({ field, title, icon }) => (
+              <div
+                key={field}
+                className="rounded-lg bg-[#161b22] border border-[#30363d] overflow-hidden min-[1920px]:min-h-[280px]"
+              >
+                <div className="w-full flex items-center gap-2 px-4 py-3 bg-[#21262d]">
+                  <ChevronRight className="w-4 h-4 text-[#8b949e] rotate-90" />
+                  <span className="text-lg">{icon}</span>
+                  <h3 className="text-[#f0f6fc] font-medium">{title}</h3>
+                </div>
+                <div className="p-3">
+                  <div className="h-[100px] bg-[#21262d]/50 rounded animate-pulse" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* 响应式网格布局：窄屏单列，宽屏(>=1920px) 2x2 */
+          <div className="grid grid-cols-1 min-[1920px]:grid-cols-2 gap-4">
+            {sections.map(({ field, title, icon, placeholder }) => (
+              <EditorSection
+                key={field}
+                title={title}
+                icon={icon}
+                value={values[field]}
+                onChange={(v) => handleChange(field, v)}
+                placeholder={placeholder}
+                editorKey={editorKey}
+                readOnly={loading}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
