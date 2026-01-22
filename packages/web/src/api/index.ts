@@ -672,5 +672,49 @@ export const getHistoryDetail = (id: string): Promise<{ history: GenerationHisto
 export const deleteHistory = (id: string) =>
   apiClient.delete(`/history/${id}`).then(extractData);
 
+// ========== 导出功能 API ==========
+
+/** 导出格式类型 */
+export type ExportFormat = 'markdown' | 'json';
+
+/** 导出进度状态 */
+export interface ExportProgress {
+  status: 'preparing' | 'exporting' | 'formatting' | 'done' | 'cancelled' | 'error';
+  currentChunk: number;
+  totalChunks: number;
+  percentage: number;
+  currentLabel: string;
+  processedDays: number;
+  totalDays: number;
+  error?: string;
+}
+
+/** 批量获取每日记录的结果 */
+export interface BatchDailyLogsResult {
+  records: DailyRecord[];
+  stats: {
+    totalDays: number;
+    filledDays: number;
+  };
+}
+
+/**
+ * 批量获取日期范围内的每日记录
+ * 用于导出功能
+ */
+export const getDailyLogsForExport = async (
+  startDate: string,
+  endDate: string
+): Promise<BatchDailyLogsResult> => {
+  const result = await apiClient.get('/daily-logs/range', {
+    params: { startDate, endDate },
+  }).then(extractData);
+  
+  return {
+    records: result.records || [],
+    stats: result.stats || { totalDays: 0, filledDays: 0 },
+  };
+};
+
 export default apiClient;
 

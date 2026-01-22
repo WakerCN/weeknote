@@ -8,11 +8,12 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRequest } from 'ahooks';
 import { toast } from 'sonner';
-import { Home as HomeIcon, Settings } from 'lucide-react';
+import { Home as HomeIcon, Settings, Download } from 'lucide-react';
 import { useTransitionNavigate } from '../lib/navigation';
 import Calendar from '../components/Calendar';
 import DayEditor from '../components/DayEditor';
 import DateRangePicker from '../components/DateRangePicker';
+import ExportDialog from '../components/ExportDialog';
 import UserMenu from '../components/UserMenu';
 import {
   getDay,
@@ -37,6 +38,9 @@ export default function DailyLog() {
   
   // 导出范围内的记录统计
   const [exportFilledDays, setExportFilledDays] = useState<number | undefined>(undefined);
+  
+  // 导出弹窗状态
+  const [showExportDialog, setShowExportDialog] = useState(false);
   
   // 日历刷新触发器
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
@@ -219,7 +223,7 @@ export default function DailyLog() {
           <DayEditor
             date={selectedDate}
             record={safeCurrentRecord}
-            loading={isSwitchingDate}
+            loading={isSwitchingDate || recordLoading}
             onSave={handleSave}
             onNavigate={handleNavigate}
           />
@@ -234,13 +238,31 @@ export default function DailyLog() {
           onChange={handleRangeChange}
           filledDays={exportFilledDays}
         />
-        <button
-          onClick={handleImportToHome}
-          className="px-6 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-white hover:from-emerald-400 hover:to-cyan-400 transition-all font-medium text-sm"
-        >
-          🚀 导入到首页生成周报
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowExportDialog(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#21262d] text-[#f0f6fc] hover:bg-[#30363d] transition-all font-medium text-sm border border-[#30363d]"
+          >
+            <Download className="w-4 h-4" />
+            导出
+          </button>
+          <button
+            onClick={handleImportToHome}
+            className="px-6 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-white hover:from-emerald-400 hover:to-cyan-400 transition-all font-medium text-sm"
+          >
+            🚀 导入到首页生成周报
+          </button>
+        </div>
       </div>
+
+      {/* 导出弹窗 */}
+      <ExportDialog
+        open={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        initialStartDate={exportStartDate}
+        initialEndDate={exportEndDate}
+        initialFilledDays={exportFilledDays}
+      />
     </div>
   );
 }
