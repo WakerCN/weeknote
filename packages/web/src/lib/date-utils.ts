@@ -174,12 +174,158 @@ export function formatMonthDay(date: string): string {
 }
 
 /**
- * 格式化日期显示 "12月23日"
+ * 格式化日期显示 "12月23日"（不含年份）
  */
 export function formatDateChinese(date: string): string {
   const d = parseLocalDate(date);
   const month = d.getMonth() + 1;
   const day = d.getDate();
   return `${month}月${day}日`;
+}
+
+/**
+ * 格式化日期显示 "2024年12月23日"（含年份）
+ */
+export function formatFullDateChinese(date: string): string {
+  const d = parseLocalDate(date);
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${year}年${month}月${day}日`;
+}
+
+/**
+ * 格式化日期为带年份的短格式 "2024/12/23"
+ */
+export function formatShortDateWithYear(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-');
+  return `${year}/${parseInt(month, 10)}/${parseInt(day, 10)}`;
+}
+
+/**
+ * 格式化日期范围为带年份格式 "2024/12/25 ~ 2025/1/5"
+ */
+export function formatDateRangeWithYear(startDate: string, endDate: string): string {
+  return `${formatShortDateWithYear(startDate)} ~ ${formatShortDateWithYear(endDate)}`;
+}
+
+/**
+ * 格式化日期范围标签（用于历史记录等）
+ * 格式: "2024/01-13 ~ 01-17" 或跨年 "2024/12-25 ~ 2025/01-05"
+ */
+export function formatDateRangeLabel(startDate: string, endDate: string): string {
+  const startYear = startDate.slice(0, 4);
+  const endYear = endDate.slice(0, 4);
+  const startMonthDay = startDate.slice(5);
+  const endMonthDay = endDate.slice(5);
+  
+  if (startYear === endYear) {
+    // 同年: "2024/01-13 ~ 01-17"
+    return `${startYear}/${startMonthDay} ~ ${endMonthDay}`;
+  } else {
+    // 跨年: "2024/12-25 ~ 2025/01-05"
+    return `${startYear}/${startMonthDay} ~ ${endYear}/${endMonthDay}`;
+  }
+}
+
+// ========== 导出功能相关 ==========
+
+/**
+ * 导出限制常量
+ */
+export const EXPORT_LIMITS = {
+  /** 单次导出最大天数 */
+  MAX_DAYS: 730,  // 2年
+  /** 直接导出（无进度）的阈值 */
+  INSTANT_THRESHOLD: 180,  // 6个月
+};
+
+/**
+ * 日期分块信息
+ */
+export interface DateChunk {
+  /** 开始日期 YYYY-MM-DD */
+  start: string;
+  /** 结束日期 YYYY-MM-DD */
+  end: string;
+  /** 显示标签，如 "2024年1月" */
+  label: string;
+}
+
+/**
+ * 将日期范围按月分块
+ * 用于大范围导出时分批请求
+ */
+export function splitDateRangeByMonth(startDate: string, endDate: string): DateChunk[] {
+  const chunks: DateChunk[] = [];
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
+  
+  let current = new Date(start);
+  
+  while (current <= end) {
+    // 当前月的开始：取 current 和 startDate 的较大者
+    const monthStart = new Date(current.getFullYear(), current.getMonth(), 1);
+    const chunkStart = current > monthStart ? current : monthStart;
+    
+    // 当前月的结束：取月末和 endDate 的较小者
+    const monthEnd = new Date(current.getFullYear(), current.getMonth() + 1, 0);
+    const chunkEnd = monthEnd > end ? end : monthEnd;
+    
+    chunks.push({
+      start: formatLocalDate(chunkStart),
+      end: formatLocalDate(chunkEnd),
+      label: `${current.getFullYear()}年${current.getMonth() + 1}月`,
+    });
+    
+    // 移动到下个月
+    current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+  }
+  
+  return chunks;
+}
+
+/**
+ * 获取上个月的开始日期
+ */
+export function getLastMonthStart(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  d.setDate(1);
+  return formatLocalDate(d);
+}
+
+/**
+ * 获取上个月的结束日期
+ */
+export function getLastMonthEnd(): string {
+  const d = new Date();
+  d.setDate(0); // 上个月最后一天
+  return formatLocalDate(d);
+}
+
+/**
+ * 获取今年1月1日
+ */
+export function getYearStart(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-01-01`;
+}
+
+/**
+ * 获取今天的日期
+ */
+export function getToday(): string {
+  return formatLocalDate(new Date());
+}
+
+/**
+ * 获取近三个月的开始日期
+ */
+export function getThreeMonthsAgo(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 3);
+  d.setDate(d.getDate() + 1);
+  return formatLocalDate(d);
 }
 

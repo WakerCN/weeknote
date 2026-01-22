@@ -143,12 +143,42 @@ export function formatMonthDay(date: string): string {
 }
 
 /**
- * 格式化日期显示 "12月23日"
+ * 格式化日期显示 "12月23日"（不含年份）
  */
 export function formatDateChinese(date: string): string {
   const d = parseLocalDate(date);
   const month = d.getMonth() + 1;
   const day = d.getDate();
   return `${month}月${day}日`;
+}
+
+/**
+ * 格式化日期显示 "2024年12月23日"（含年份）
+ */
+export function formatFullDateChinese(date: string): string {
+  const d = parseLocalDate(date);
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  return `${year}年${month}月${day}日`;
+}
+
+/**
+ * 格式化日期范围标签（用于历史记录等）
+ * 格式: "2024/01-13 ~ 01-17" 或跨年 "2024/12-25 ~ 2025/01-05"
+ */
+export function formatDateRangeLabel(startDate: string, endDate: string): string {
+  const startYear = startDate.slice(0, 4);
+  const endYear = endDate.slice(0, 4);
+  const startMonthDay = startDate.slice(5);
+  const endMonthDay = endDate.slice(5);
+  
+  if (startYear === endYear) {
+    // 同年: "2024/01-13 ~ 01-17"
+    return `${startYear}/${startMonthDay} ~ ${endMonthDay}`;
+  } else {
+    // 跨年: "2024/12-25 ~ 2025/01-05"
+    return `${startYear}/${startMonthDay} ~ ${endYear}/${endMonthDay}`;
+  }
 }
 
