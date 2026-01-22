@@ -16,6 +16,7 @@ import {
   generateReport,
   generateReportStream,
   isReasoningModel,
+  formatDateRangeLabel,
   type GeneratorConfig,
   type StreamCallbacks,
   type ValidationWarning,
@@ -180,7 +181,7 @@ router.post(
         userId,
         dateStart: startDate,
         dateEnd: endDate,
-        dateRangeLabel: `${startDate.slice(5)} ~ ${endDate.slice(5)}`,
+        dateRangeLabel: formatDateRangeLabel(startDate, endDate),
         inputText,
         outputMarkdown: result.report.rawMarkdown,
         modelId: result.modelId,
@@ -389,8 +390,8 @@ router.post('/stream', async (req: AuthRequest, res: Response) => {
         // 场景1：前端传递了明确的日期范围（导入模式）
         dateStart = dateRange.startDate;
         dateEnd = dateRange.endDate;
-        // 格式化为展示标签 "01-13 ~ 01-17"
-        dateRangeLabel = `${dateRange.startDate.slice(5)} ~ ${dateRange.endDate.slice(5)}`;
+        // 格式化为展示标签 "2024/01-13 ~ 01-17"
+        dateRangeLabel = formatDateRangeLabel(dateRange.startDate, dateRange.endDate);
       } else {
         // 场景2：手动输入，从内容中解析
         const dates = weeklyLog.entries

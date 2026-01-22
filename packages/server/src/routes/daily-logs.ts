@@ -383,9 +383,8 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
 
       filledDays++;
       
-      // 日期格式：从 "2024-12-23" 提取 "12-23"，配合 "周X"
-      const shortDate = record.date.slice(5); // "12-23"
-      lines.push(`${shortDate} | ${record.dayOfWeek}`);
+      // 日期格式：使用完整日期 "2024-12-23"，配合 "周X"
+      lines.push(`${record.date} | ${record.dayOfWeek}`);
       
       // Plan 段落
       lines.push('Plan');
