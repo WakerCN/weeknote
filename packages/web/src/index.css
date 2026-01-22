@@ -230,6 +230,36 @@ body {
   transform: translate(-50%, -50%) scale(1);
 }
 
+/* 弹窗关闭动画 */
+@keyframes dialog-exit {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+}
+
+.dialog-closing {
+  animation: dialog-exit 0.15s ease-in forwards;
+}
+
+/* 遮罩层关闭动画 */
+@keyframes overlay-exit {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.overlay-closing {
+  animation: overlay-exit 0.15s ease-in forwards;
+}
+
 /* View Transitions API - 页面切换动画 */
 
 /* 设置页面右侧内容区域的过渡标识 */

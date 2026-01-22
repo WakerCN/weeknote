@@ -7,6 +7,19 @@
 /* 编辑器容器 - 确保弹出层不被裁剪 */
 .milkdown-editor-container {
   position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 编辑器内部撑满容器 */
+.milkdown-editor-container .milkdown {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.milkdown-editor-container .milkdown .ProseMirror {
+  flex: 1;
 }
 
 /* 斜杠菜单样式 - 确保高 z-index 和正确显示 */
