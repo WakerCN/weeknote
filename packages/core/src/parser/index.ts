@@ -7,9 +7,10 @@ import type { DailyLogEntry, WeeklyLog } from '../types/index.js';
 
 /**
  * 日期行正则表达式
- * 匹配: "12-15 | 周一", "12-15|周一", "12-15 | 周一 " 等
+ * 匹配: "2024-12-15 | 周一", "12-15 | 周一", "12-15|周一" 等
+ * 支持年份可选：(\d{4}-)? 匹配可选的年份前缀
  */
-const DATE_LINE_PATTERN = /^(\d{1,2}-\d{1,2})\s*\|\s*(周[一二三四五六日])\s*$/;
+const DATE_LINE_PATTERN = /^((?:\d{4}-)?\d{1,2}-\d{1,2})\s*\|\s*(周[一二三四五六日])\s*$/;
 
 /**
  * 段落标题正则表达式
@@ -64,7 +65,7 @@ const WARNING_MESSAGES: Record<ValidationWarningType, { message: string; suggest
     message: '未找到日期标识',
     suggestion: `按天记录可以让 AI 更好地理解工作进度。推荐格式：
 
-  12-23 | 周一
+  2024-12-23 | 周一
   Plan
   - 计划任务 1
   Result
