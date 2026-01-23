@@ -65,6 +65,29 @@ describe('parseDailyLog', () => {
     expect(result.entries[1].dayOfWeek).toBe('周二');
   });
 
+  it('应该支持年月日格式的日期行', () => {
+    const input = `2024-12-23 | 周一
+Plan
+- 计划任务
+
+Result
+- 完成内容
+
+2024-12-24 | 周二
+Plan
+- 另一个任务`;
+
+    const result = parseDailyLog(input);
+
+    expect(result.entries).toHaveLength(2);
+    expect(result.entries[0].date).toBe('2024-12-23');
+    expect(result.entries[0].dayOfWeek).toBe('周一');
+    expect(result.entries[1].date).toBe('2024-12-24');
+    expect(result.entries[1].dayOfWeek).toBe('周二');
+    expect(result.startDate).toBe('2024-12-23');
+    expect(result.endDate).toBe('2024-12-24');
+  });
+
   it('应该解析 Plan 段落', () => {
     const result = parseDailyLog(SAMPLE_DAILY_LOG);
 
@@ -176,6 +199,12 @@ describe('validateDailyLog', () => {
 
   it('对于有日期行和段落结构但缺少一些段落的输入应该返回 valid', () => {
     const result = validateDailyLog('12-23 | 周一\nPlan\n- 计划任务');
+
+    expect(result.status).toBe('valid');
+  });
+
+  it('对于年月日格式的日期行应该返回 valid', () => {
+    const result = validateDailyLog('2024-12-23 | 周一\nPlan\n- 计划任务');
 
     expect(result.status).toBe('valid');
   });
