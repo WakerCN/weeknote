@@ -6,6 +6,7 @@ import * as dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { connectDB, disconnectDB, isDBConnected } from './db/connection.js';
+import { seedSystemTemplates } from './db/seed/system-templates.js';
 import { checkJwtSecretConfig } from './auth/jwt.js';
 import authRouter from './routes/auth.js';
 import dailyLogsRouter from './routes/daily-logs.js';
@@ -109,6 +110,9 @@ async function startServer() {
     // 连接 MongoDB
     logger.info('正在连接 MongoDB...');
     await connectDB();
+
+    // 初始化系统模板
+    await seedSystemTemplates();
 
     // 启动提醒调度器
     cloudReminderScheduler.start();
