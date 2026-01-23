@@ -224,7 +224,7 @@ export default function Calendar({
           key={`${currentMonth.year}-${currentMonth.month}`}
           className="grid grid-cols-7 gap-1 animate-in fade-in duration-150"
         >
-          {calendarData.map((dayInfo, index) => {
+          {calendarData.map((dayInfo) => {
             // 判断是否为节假日类型（用于文字颜色）
             const isHolidayType = dayInfo.dateLabel?.type === 'holiday' || dayInfo.dateLabel?.type === 'holiday-name';
             const isWorkdayType = dayInfo.dateLabel?.type === 'workday';

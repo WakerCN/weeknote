@@ -118,7 +118,7 @@ export const HistorySidebar = forwardRef<HistorySidebarRef, HistorySidebarProps>
   const { confirm, ConfirmDialogComponent } = useConfirm();
 
   // 加载历史列表
-  const { loading, run: loadMore, refresh } = useRequest(
+  const { loading, run: loadMore, refresh: _refresh } = useRequest(
     async (skip = 0) => {
       const res = await getHistoryList(20, skip);
       return res;
