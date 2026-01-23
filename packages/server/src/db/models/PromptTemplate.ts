@@ -29,6 +29,9 @@ export interface IPromptTemplate extends Document {
   // Prompt 广场相关
   usageCount: number;          // 使用次数
   likeCount: number;           // 点赞数
+  commentCount: number;        // 评论数
+  authorName?: string;         // 作者展示名（发布时快照）
+  copiedFrom?: mongoose.Types.ObjectId;  // 复制来源（追踪模板来源）
 
   createdAt: Date;
   updatedAt: Date;
@@ -99,6 +102,21 @@ const PromptTemplateSchema = new Schema<IPromptTemplate, IPromptTemplateModel>(
       type: Number,
       default: 0,
       min: 0,
+    },
+    commentCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    authorName: {
+      type: String,
+      trim: true,
+      maxlength: [50, '作者名称最多 50 个字符'],
+    },
+    copiedFrom: {
+      type: Schema.Types.ObjectId,
+      ref: 'PromptTemplate',
+      default: null,
     },
   },
   {

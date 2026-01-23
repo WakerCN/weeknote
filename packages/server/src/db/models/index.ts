@@ -29,3 +29,11 @@ export type {
   IPromptTemplateModel,
   PromptVisibility,
 } from './PromptTemplate.js';
+
+// Prompt 收藏模型
+export { PromptFavorite } from './PromptFavorite.js';
+export type { IPromptFavorite, IPromptFavoriteModel } from './PromptFavorite.js';
+
+// Prompt 评论模型
+export { PromptComment } from './PromptComment.js';
+export type { IPromptComment, IPromptCommentModel } from './PromptComment.js';
