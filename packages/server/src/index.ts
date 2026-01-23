@@ -2,7 +2,7 @@
  * WeekNote 云端后端服务入口
  */
 
-import dotenv from 'dotenv';
+import * as dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
 import { connectDB, disconnectDB, isDBConnected } from './db/connection.js';
