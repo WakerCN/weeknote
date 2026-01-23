@@ -1,117 +1,62 @@
 /**
  * 每日记录页面
- * 
+ *
  * 改版：使用日历视图替代周列表，支持任意日期范围导出
  */
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRequest } from 'ahooks';
 import { toast } from 'sonner';
 import { Home as HomeIcon, Settings, Download } from 'lucide-react';
-import { useTransitionNavigate } from '../lib/navigation';
-import Calendar from '../components/Calendar';
-import DayEditor from '../components/DayEditor';
-import DateRangePicker from '../components/DateRangePicker';
-import ExportDialog from '../components/ExportDialog';
-import UserMenu from '../components/UserMenu';
-import {
-  getDay,
-  saveDay,
-  exportRange,
-  getDateRange,
-  type SaveDayRecordParams,
-} from '../api';
-import { formatLocalDate, getWeekStart, getWeekEnd } from '@/lib/date-utils';
+import { useTransitionNavigate } from '../../lib/navigation';
+import Calendar from '@/components/Calendar';
+import DayEditor from '@/components/DayEditor';
+import DateRangePicker from '@/components/DateRangePicker';
+import ExportDialog from '@/components/ExportDialog';
+import UserMenu from '@/components/UserMenu';
+import { getDay, saveDay, exportRange as exportRangeApi, type SaveDayRecordParams } from '@/api';
+import { formatLocalDate } from '@/lib/date-utils';
+import { useExportRange } from './useExportRange';
+import { useDateSwitching } from './useDateSwitching';
 
 export default function DailyLog() {
   const { date: urlDate } = useParams<{ date?: string }>();
   const navigate = useTransitionNavigate();
-  
+
   // 初始化日期（优先使用 URL 参数）
   const initialDate = useMemo(() => urlDate || formatLocalDate(new Date()), []);
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  
-  // 导出日期范围（默认本周周一到周日）
-  const [exportStartDate, setExportStartDate] = useState(() => getWeekStart());
-  const [exportEndDate, setExportEndDate] = useState(() => getWeekEnd(getWeekStart()));
-  
-  // 导出范围内的记录统计
-  const [exportFilledDays, setExportFilledDays] = useState<number | undefined>(undefined);
-  
-  // 导出弹窗状态
-  const [showExportDialog, setShowExportDialog] = useState(false);
-  
+
+  // 导出范围管理
+  const exportRange = useExportRange();
+
   // 日历刷新触发器
   const [calendarRefreshKey, setCalendarRefreshKey] = useState(0);
-  
-  // 仅在"切换日期"时展示右侧模糊遮罩
-  const [isSwitchingDate, setIsSwitchingDate] = useState(false);
-  const dateSwitchRef = useRef<{ target: string | null; sawLoading: boolean }>({
-    target: null,
-    sawLoading: false,
-  });
-  
-  // 记录上一次处理的 URL 日期，避免重复处理
-  const prevUrlDateRef = useRef<string | undefined>(urlDate);
 
   // 加载当前日期记录
-  const { data: currentRecord, refresh: refreshRecord, loading: recordLoading } = useRequest(
-    () => getDay(selectedDate),
-    {
-      refreshDeps: [selectedDate],
-    }
-  );
+  const {
+    data: currentRecord,
+    refresh: refreshRecord,
+    loading: recordLoading,
+  } = useRequest(() => getDay(selectedDate), {
+    refreshDeps: [selectedDate],
+  });
 
-  // 加载导出范围内的统计
-  const { run: loadExportStats } = useRequest(
-    async () => {
-      const result = await getDateRange(exportStartDate, exportEndDate);
-      return result;
-    },
-    {
-      manual: true,
-      onSuccess: (result) => {
-        setExportFilledDays(result?.stats?.filled ?? 0);
-      },
-    }
-  );
-
-  // 导出范围变化时重新加载统计
-  useEffect(() => {
-    loadExportStats();
-  }, [exportStartDate, exportEndDate]);
+  // 日期切换过渡
+  const dateSwitching = useDateSwitching({
+    urlDate,
+    selectedDate,
+    recordLoading,
+  });
 
   // 当 URL 参数变化时更新选中日期
   useEffect(() => {
-    if (urlDate && urlDate !== prevUrlDateRef.current) {
-      prevUrlDateRef.current = urlDate;
-      
-      if (urlDate !== selectedDate) {
-        setIsSwitchingDate(true);
-        dateSwitchRef.current = { target: urlDate, sawLoading: false };
-        setSelectedDate(urlDate);
-      }
+    if (urlDate && urlDate !== selectedDate) {
+      dateSwitching.startSwitch(urlDate);
+      setSelectedDate(urlDate);
     }
-  }, [urlDate, selectedDate]);
-
-  // 监听 recordLoading：只有"因切换日期"触发的加载才会驱动 isSwitchingDate 结束
-  useEffect(() => {
-    const { target, sawLoading } = dateSwitchRef.current;
-    if (!isSwitchingDate || !target || target !== selectedDate) return;
-
-    if (recordLoading) {
-      if (!sawLoading) {
-        dateSwitchRef.current = { target, sawLoading: true };
-      }
-      return;
-    }
-
-    if (sawLoading) {
-      setIsSwitchingDate(false);
-      dateSwitchRef.current = { target: null, sawLoading: false };
-    }
-  }, [recordLoading, selectedDate, isSwitchingDate]);
+  }, [urlDate]);
 
   // 保存记录
   const handleSave = async (date: string, params: SaveDayRecordParams) => {
@@ -123,19 +68,17 @@ export default function DailyLog() {
     // 刷新日历状态
     setCalendarRefreshKey((prev) => prev + 1);
     // 如果保存的日期在导出范围内，刷新统计
-    if (date >= exportStartDate && date <= exportEndDate) {
-      loadExportStats();
+    if (date >= exportRange.startDate && date <= exportRange.endDate) {
+      exportRange.refreshStats();
     }
   };
 
   // 选择日期
   const handleSelectDate = (date: string) => {
     if (date === selectedDate) return;
-    
-    setIsSwitchingDate(true);
-    dateSwitchRef.current = { target: date, sawLoading: false };
+
+    dateSwitching.startSwitch(date);
     setSelectedDate(date);
-    
     navigate(`/daily/${date}`, { replace: true });
   };
 
@@ -148,16 +91,10 @@ export default function DailyLog() {
     handleSelectDate(newDateStr);
   };
 
-  // 日期范围变化
-  const handleRangeChange = (start: string, end: string) => {
-    setExportStartDate(start);
-    setExportEndDate(end);
-  };
-
   // 导入到首页
   const handleImportToHome = async () => {
     try {
-      const result = await exportRange(exportStartDate, exportEndDate);
+      const result = await exportRangeApi(exportRange.startDate, exportRange.endDate);
       if (!result.text) {
         toast.warning('所选时间段暂无记录');
         return;
@@ -165,7 +102,7 @@ export default function DailyLog() {
       // 使用 sessionStorage 传递一次性数据，避免 location.state 导致的重复触发问题
       sessionStorage.setItem('weeknote_import', JSON.stringify({
         dailyLog: result.text,
-        dateRange: { startDate: exportStartDate, endDate: exportEndDate },
+        dateRange: { startDate: exportRange.startDate, endDate: exportRange.endDate },
         filledDays: result.filledDays,
       }));
       navigate('/', { scope: 'root' });
@@ -223,7 +160,7 @@ export default function DailyLog() {
           <DayEditor
             date={selectedDate}
             record={safeCurrentRecord}
-            loading={isSwitchingDate || recordLoading}
+            loading={dateSwitching.isSwitching || recordLoading}
             onSave={handleSave}
             onNavigate={handleNavigate}
           />
@@ -232,15 +169,15 @@ export default function DailyLog() {
 
       {/* 底部操作栏 */}
       <div className="h-16 flex items-center justify-between px-6 bg-[#161b22] border-t border-[#30363d]">
-        <DateRangePicker
-          startDate={exportStartDate}
-          endDate={exportEndDate}
-          onChange={handleRangeChange}
-          filledDays={exportFilledDays}
+      <DateRangePicker
+          startDate={exportRange.startDate}
+          endDate={exportRange.endDate}
+          onChange={exportRange.setRange}
+          filledDays={exportRange.filledDays}
         />
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowExportDialog(true)}
+            onClick={exportRange.openDialog}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#21262d] text-[#f0f6fc] hover:bg-[#30363d] transition-all font-medium text-sm border border-[#30363d]"
           >
             <Download className="w-4 h-4" />
@@ -257,11 +194,11 @@ export default function DailyLog() {
 
       {/* 导出弹窗 */}
       <ExportDialog
-        open={showExportDialog}
-        onClose={() => setShowExportDialog(false)}
-        initialStartDate={exportStartDate}
-        initialEndDate={exportEndDate}
-        initialFilledDays={exportFilledDays}
+        open={exportRange.showDialog}
+        onClose={exportRange.closeDialog}
+        initialStartDate={exportRange.startDate}
+        initialEndDate={exportRange.endDate}
+        initialFilledDays={exportRange.filledDays}
       />
     </div>
   );

@@ -4,7 +4,7 @@ import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import Home from './pages/Home';
+import Home from './pages/Home/index';
 import Auth from './pages/Auth';
 import './index.css';
 
@@ -14,7 +14,7 @@ const ApiKeyModel = lazy(() => import('./pages/settings/ApiKeyModel'));
 const PromptSettings = lazy(() => import('./pages/settings/PromptSettings'));
 const ReminderSettings = lazy(() => import('./pages/settings/ReminderSettings'));
 const AccountSettings = lazy(() => import('./pages/settings/AccountSettings'));
-const DailyLog = lazy(() => import('./pages/DailyLog'));
+const DailyLog = lazy(() => import('./pages/DailyLog/index'));
 
 // 加载中占位组件
 function LoadingFallback() {
