@@ -15,6 +15,7 @@ const PromptSettings = lazy(() => import('./pages/settings/PromptSettings'));
 const ReminderSettings = lazy(() => import('./pages/settings/ReminderSettings'));
 const AccountSettings = lazy(() => import('./pages/settings/AccountSettings'));
 const DailyLog = lazy(() => import('./pages/DailyLog/index'));
+const PromptPlaza = lazy(() => import('./pages/PromptPlaza/index'));
 
 // 加载中占位组件
 function LoadingFallback() {
@@ -30,6 +31,14 @@ const router = createBrowserRouter([
   {
     path: '/auth',
     element: <Auth />,
+  },
+  {
+    path: '/prompt-plaza',
+    element: (
+      <Suspense fallback={<LoadingFallback />}>
+        <PromptPlaza />
+      </Suspense>
+    ),
   },
   {
     path: '/',
