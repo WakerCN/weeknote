@@ -46,13 +46,42 @@ export interface GenerateResult {
   warnings?: ValidationWarning[];
 }
 
+// Prompt 模板可见性
+export type PromptVisibility = 'private' | 'public' | 'system';
+
 // Prompt 模板类型
 export interface PromptTemplate {
   id: string;
+  _id?: string;
+  userId?: string | null;
   name: string;
   description?: string;
   systemPrompt: string;
   userPromptTemplate: string;
+  visibility: PromptVisibility;
+  isActive?: boolean;
+  usageCount?: number;
+  likeCount?: number;
+  commentCount?: number;
+  authorName?: string;
+  copiedFrom?: string;
+  isFavorited?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// 评论类型
+export interface PromptComment {
+  _id: string;
+  templateId: string;
+  userId: string;
+  authorName: string;
+  authorAvatar?: string;
+  content: string;
+  parentId?: string;
+  likeCount: number;
+  isDeleted: boolean;
+  replies?: PromptComment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -446,6 +475,115 @@ export const deletePrompt = (id: string) =>
  */
 export const activatePrompt = (id: string) =>
   apiClient.post(`/prompt-template/${id}/activate`).then(extractData);
+
+/**
+ * 点赞模板
+ */
+export const likePrompt = (id: string) =>
+  apiClient.post(`/prompt-template/${id}/like`).then(extractData);
+
+/**
+ * 收藏模板
+ */
+export const favoritePrompt = (id: string) =>
+  apiClient.post(`/prompt-template/${id}/favorite`).then(extractData);
+
+/**
+ * 取消收藏模板
+ */
+export const unfavoritePrompt = (id: string) =>
+  apiClient.delete(`/prompt-template/${id}/favorite`).then(extractData);
+
+/**
+ * 获取收藏的模板列表
+ */
+export const getFavoritePrompts = () =>
+  apiClient.get('/prompt-template/favorites').then(extractData);
+
+/**
+ * 发布模板到广场
+ */
+export const publishPrompt = (id: string) =>
+  apiClient.post(`/prompt-template/${id}/publish`).then(extractData);
+
+/**
+ * 从广场撤回模板
+ */
+export const unpublishPrompt = (id: string) =>
+  apiClient.post(`/prompt-template/${id}/unpublish`).then(extractData);
+
+/**
+ * 复制模板为新模板
+ */
+export const copyPrompt = (id: string) =>
+  apiClient.post(`/prompt-template/${id}/copy`).then(extractData);
+
+// ========== Prompt 广场 API ==========
+
+export interface PublicPromptsParams {
+  limit?: number;
+  skip?: number;
+  search?: string;
+  sort?: 'popular' | 'latest' | 'likes';
+}
+
+export interface PublicPromptsResponse {
+  templates: PromptTemplate[];
+  pagination: {
+    total: number;
+    limit: number;
+    skip: number;
+    hasMore: boolean;
+  };
+}
+
+/**
+ * 获取公开模板列表（Prompt 广场）
+ */
+export const getPublicPrompts = (params: PublicPromptsParams = {}): Promise<PublicPromptsResponse> =>
+  apiClient.get('/prompt-template/public', { params }).then(extractData);
+
+/**
+ * 获取模板详情
+ */
+export const getPromptDetail = (id: string) =>
+  apiClient.get(`/prompt-template/${id}`).then(extractData);
+
+// ========== 评论 API ==========
+
+export interface CommentsResponse {
+  comments: PromptComment[];
+  pagination: {
+    total: number;
+    limit: number;
+    skip: number;
+    hasMore: boolean;
+  };
+}
+
+/**
+ * 获取模板评论列表
+ */
+export const getPromptComments = (templateId: string, params?: { limit?: number; skip?: number }): Promise<CommentsResponse> =>
+  apiClient.get(`/prompt-template/${templateId}/comments`, { params }).then(extractData);
+
+/**
+ * 发表评论
+ */
+export const createComment = (templateId: string, content: string, parentId?: string) =>
+  apiClient.post(`/prompt-template/${templateId}/comments`, { content, parentId }).then(extractData);
+
+/**
+ * 删除评论
+ */
+export const deleteComment = (commentId: string) =>
+  apiClient.delete(`/prompt-template/comments/${commentId}`).then(extractData);
+
+/**
+ * 点赞评论
+ */
+export const likeComment = (commentId: string) =>
+  apiClient.post(`/prompt-template/comments/${commentId}/like`).then(extractData);
 
 // ========== 每日记录 API ==========
 
