@@ -310,10 +310,10 @@ export default function Auth() {
             if (emailError) setEmailError('');
           }}
           onBlur={() => setEmailError(validateEmail(email))}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             emailError ? 'border-red-500' : 'border-[#30363d]'
           }`}
-          placeholder="your@email.com"
+          placeholder="请输入你的邮箱"
           disabled={loading}
           autoFocus
         />
@@ -432,10 +432,10 @@ export default function Auth() {
             setEmail(e.target.value);
             if (emailError) setEmailError('');
           }}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             emailError ? 'border-red-500' : 'border-[#30363d]'
           }`}
-          placeholder="your@email.com"
+          placeholder="请输入你的邮箱"
           disabled={loading}
         />
         {emailError && (
@@ -454,10 +454,10 @@ export default function Auth() {
             setPassword(e.target.value);
             if (passwordError) setPasswordError('');
           }}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             passwordError ? 'border-red-500' : 'border-[#30363d]'
           }`}
-          placeholder="••••••••"
+          placeholder="请输入密码"
           disabled={loading}
         />
         {passwordError && (
@@ -529,7 +529,7 @@ export default function Auth() {
             setEmail(e.target.value);
             if (emailError) setEmailError('');
           }}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             emailError ? 'border-red-500' : 'border-[#30363d]'
           }`}
           placeholder="your@email.com"
@@ -551,7 +551,7 @@ export default function Auth() {
             setName(e.target.value);
             if (nameError) setNameError('');
           }}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             nameError ? 'border-red-500' : 'border-[#30363d]'
           }`}
           placeholder="你的名字"
@@ -573,7 +573,7 @@ export default function Auth() {
             setPassword(e.target.value);
             if (passwordError) setPasswordError('');
           }}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             passwordError ? 'border-red-500' : 'border-[#30363d]'
           }`}
           placeholder="至少 6 个字符"
@@ -595,7 +595,7 @@ export default function Auth() {
             setConfirmPassword(e.target.value);
             if (confirmPasswordError) setConfirmPasswordError('');
           }}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             confirmPasswordError ? 'border-red-500' : 'border-[#30363d]'
           }`}
           placeholder="再次输入密码"
@@ -653,7 +653,7 @@ export default function Auth() {
             setEmail(e.target.value);
             if (emailError) setEmailError('');
           }}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             emailError ? 'border-red-500' : 'border-[#30363d]'
           }`}
           placeholder="your@email.com"
@@ -732,7 +732,7 @@ export default function Auth() {
             setPassword(e.target.value);
             if (passwordError) setPasswordError('');
           }}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             passwordError ? 'border-red-500' : 'border-[#30363d]'
           }`}
           placeholder="至少 6 个字符"
@@ -754,7 +754,7 @@ export default function Auth() {
             setConfirmPassword(e.target.value);
             if (confirmPasswordError) setConfirmPasswordError('');
           }}
-          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
+          className={`w-full px-3 py-2 bg-[#0d1117] border rounded-md text-[#f0f6fc] placeholder:text-[#484f58] focus:outline-none focus:ring-2 focus:ring-[#1f6feb] focus:border-transparent ${
             confirmPasswordError ? 'border-red-500' : 'border-[#30363d]'
           }`}
           placeholder="再次输入新密码"
