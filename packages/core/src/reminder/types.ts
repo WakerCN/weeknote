@@ -126,3 +126,25 @@ export interface PushResult {
   /** 错误信息 */
   error?: string;
 }
+
+/**
+ * 提醒消息上下文（用于生成个性化消息）
+ */
+export interface ReminderMessageContext {
+  /** 用户名 */
+  userName: string;
+  /** 当前时间（如 "10:05"） */
+  time: string;
+  /** 当前日期（如 "1月26日"） */
+  date: string;
+  /** 星期几（如 "周一"） */
+  weekday: string;
+  /** 本周已填写天数 */
+  filledDays: number;
+  /** 本周工作日总数（通常为 5） */
+  totalWorkdays: number;
+  /** 今天是否已填写 */
+  todayFilled: boolean;
+  /** 网站地址 */
+  siteUrl: string;
+}

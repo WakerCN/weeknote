@@ -14,6 +14,7 @@ export type {
   ServerChanConfig,
   ChannelsConfig,
   SaveReminderConfigParams,
+  ReminderMessageContext,
 } from './types.js';
 
 // 配置管理
@@ -51,6 +52,11 @@ export {
 export {
   sendDingtalkMessage,
   sendDingtalkTestMessage,
+  sendDingtalkActionCard,
+  sendDingtalkRichReminder,
+  generateRichReminderContent,
+  type ActionCardButton,
+  type ActionCardOptions,
 } from './dingtalk.js';
 
 // 定时调度器
