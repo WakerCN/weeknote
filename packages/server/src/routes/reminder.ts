@@ -343,9 +343,13 @@ router.post(
 
       logger.info('发送钉钉测试消息', { email: req.user!.email });
 
+      // 获取网站 URL
+      const siteUrl = process.env.SITE_URL || process.env.WEB_URL || 'http://localhost:5173';
+
       const result = await sendDingtalkTestMessage(
         trimmedWebhook,
-        secret?.trim() || undefined
+        secret?.trim() || undefined,
+        siteUrl
       );
 
       if (result.success) {

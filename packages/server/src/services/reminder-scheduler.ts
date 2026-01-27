@@ -8,15 +8,18 @@
  */
 
 import cron, { type ScheduledTask } from 'node-cron';
+import mongoose from 'mongoose';
 import { User, type IUser } from '../db/models/User.js';
+import { DailyLog } from '../db/models/DailyLog.js';
 import { holidayService } from './holiday-service.js';
 import {
   sendServerChanMessage,
-  sendDingtalkMessage,
+  sendDingtalkRichReminder,
   generateReminderMessage,
   type ReminderConfig,
   type ScheduleTime,
   type ChannelSchedules,
+  type ReminderMessageContext,
 } from '@weeknote/core';
 import { createLogger } from '../logger/index.js';
 
@@ -88,6 +91,130 @@ function isWorkday(date: Date = new Date()): { isWorkday: boolean; reason: strin
  */
 function formatTime(hour: number, minute: number): string {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/**
+ * 获取本周开始日期（周一）
+ */
+function getWeekStart(date: Date): string {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return formatLocalDate(d);
+}
+
+/**
+ * 获取本周结束日期（周日）
+ */
+function getWeekEnd(weekStart: string): string {
+  const d = new Date(weekStart + 'T00:00:00');
+  d.setDate(d.getDate() + 6);
+  return formatLocalDate(d);
+}
+
+/**
+ * 格式化本地日期为 YYYY-MM-DD
+ */
+function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * 获取网站 URL
+ */
+function getSiteUrl(): string {
+  return process.env.SITE_URL || process.env.WEB_URL || 'http://localhost:5173';
+}
+
+/**
+ * 获取用户本周填写统计
+ */
+async function getUserWeeklyStats(userId: mongoose.Types.ObjectId): Promise<{
+  filledDays: number;
+  totalWorkdays: number;
+  todayFilled: boolean;
+}> {
+  const now = new Date();
+  const todayDate = formatLocalDate(now);
+  const weekStart = getWeekStart(now);
+  const weekEnd = getWeekEnd(weekStart);
+
+  try {
+    const records = await DailyLog.findByUserAndDateRange(userId, weekStart, weekEnd);
+
+    let filledDays = 0;
+    let todayFilled = false;
+
+    for (const record of records) {
+      const hasContent =
+        record.plan.trim() || record.result.trim() || record.issues.trim() || record.notes.trim();
+      
+      if (hasContent) {
+        // 只统计工作日（周一到周五）
+        const d = new Date(record.date + 'T00:00:00');
+        const dayOfWeek = d.getDay();
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          filledDays++;
+        }
+        
+        // 检查今天是否已填写
+        if (record.date === todayDate) {
+          todayFilled = true;
+        }
+      }
+    }
+
+    return {
+      filledDays,
+      totalWorkdays: 5,
+      todayFilled,
+    };
+  } catch (error) {
+    logger.error('获取用户周统计失败', error as Error);
+    return {
+      filledDays: 0,
+      totalWorkdays: 5,
+      todayFilled: false,
+    };
+  }
+}
+
+/**
+ * 构建提醒消息上下文
+ */
+async function buildReminderContext(user: IUser): Promise<ReminderMessageContext> {
+  const now = new Date();
+  
+  const time = now.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  const date = now.toLocaleDateString('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const weekday = weekdays[now.getDay()];
+
+  const stats = await getUserWeeklyStats(user._id);
+
+  return {
+    userName: user.name || user.email.split('@')[0],
+    time,
+    date,
+    weekday,
+    filledDays: stats.filledDays,
+    totalWorkdays: stats.totalWorkdays,
+    todayFilled: stats.todayFilled,
+    siteUrl: getSiteUrl(),
+  };
 }
 
 /**
@@ -187,7 +314,7 @@ export class CloudReminderScheduler {
         (t) => t.enabled && t.hour === hour && t.minute === minute
       );
       for (const time of matchingTimes) {
-        await this.sendToDingtalk(user.email, channels.dingtalk.webhook, channels.dingtalk.secret, time);
+        await this.sendToDingtalk(user, channels.dingtalk.webhook, channels.dingtalk.secret, time);
       }
     }
 
@@ -203,24 +330,29 @@ export class CloudReminderScheduler {
   }
 
   /**
-   * 发送钉钉消息
+   * 发送钉钉消息（个性化 ActionCard）
    */
   private async sendToDingtalk(
-    userEmail: string,
+    user: IUser,
     webhook: string,
     secret: string | undefined,
     time: ScheduleTime
   ): Promise<void> {
     const scheduleName = time.label || formatTime(time.hour, time.minute);
-    logger.info(`触发钉钉「${scheduleName}」`, { email: userEmail });
+    logger.info(`触发钉钉「${scheduleName}」`, { email: user.email });
 
-    const { title, content } = generateReminderMessage();
-    const result = await sendDingtalkMessage(webhook, title, content, secret);
+    try {
+      // 构建个性化消息上下文
+      const context = await buildReminderContext(user);
+      const result = await sendDingtalkRichReminder(webhook, context, secret);
 
-    if (result.success) {
-      logger.success(`钉钉「${scheduleName}」推送成功`, { email: userEmail });
-    } else {
-      logger.error(`钉钉「${scheduleName}」推送失败`, { email: userEmail, error: result.error });
+      if (result.success) {
+        logger.success(`钉钉「${scheduleName}」推送成功`, { email: user.email });
+      } else {
+        logger.error(`钉钉「${scheduleName}」推送失败`, { email: user.email, error: result.error });
+      }
+    } catch (error) {
+      logger.error(`钉钉「${scheduleName}」推送异常`, { email: user.email, error: (error as Error).message });
     }
   }
 
