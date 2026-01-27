@@ -37,7 +37,6 @@ export default function DailyLog() {
   // 加载当前日期记录
   const {
     data: currentRecord,
-    refresh: refreshRecord,
     loading: recordLoading,
   } = useRequest(() => getDay(selectedDate), {
     refreshDeps: [selectedDate],
@@ -62,9 +61,8 @@ export default function DailyLog() {
   const handleSave = async (date: string, params: SaveDayRecordParams) => {
     // 注意：错误 toast 已由 api-client 统一处理，这里无需重复调用
     await saveDay(date, params);
-    if (date === selectedDate) {
-      await refreshRecord();
-    }
+    // 保存成功后不需要 refreshRecord()，前端状态已是最新的
+    // 这样可以实现无感保存，避免显示 loading 遮罩
     // 刷新日历状态
     setCalendarRefreshKey((prev) => prev + 1);
     // 如果保存的日期在导出范围内，刷新统计
