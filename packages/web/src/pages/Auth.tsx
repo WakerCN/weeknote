@@ -13,6 +13,7 @@ import {
   validateName,
   maskEmail,
 } from '../lib/validators';
+import { Checkbox } from '../components/ui/checkbox';
 
 /** 登录方式 Tab */
 type AuthTab = 'code' | 'password';
@@ -36,6 +37,7 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   
   // 错误状态
   const [emailError, setEmailError] = useState('');
@@ -65,6 +67,15 @@ export default function Auth() {
       return () => clearTimeout(timer);
     }
   }, [countdown]);
+
+  // 初始化时读取记住的邮箱
+  useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberedEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
 
   // 切换 Tab 时重置状态
   const handleTabChange = (newTab: AuthTab) => {
@@ -170,6 +181,12 @@ export default function Auth() {
     setLoading(true);
     try {
       await login(email, password);
+      // 根据"记住我"状态保存或清除邮箱
+      if (rememberMe) {
+        localStorage.setItem('rememberedEmail', email);
+      } else {
+        localStorage.removeItem('rememberedEmail');
+      }
       navigate('/');
     } catch {
       // 错误已处理
@@ -446,6 +463,20 @@ export default function Auth() {
         {passwordError && (
           <p className="mt-1 text-sm text-red-400">{passwordError}</p>
         )}
+      </div>
+
+      {/* 记住我 */}
+      <div 
+        className="flex items-center gap-2 cursor-pointer select-none"
+        onClick={() => !loading && setRememberMe(!rememberMe)}
+      >
+        <Checkbox
+          checked={rememberMe}
+          onChange={setRememberMe}
+          disabled={loading}
+          size="sm"
+        />
+        <span className="text-sm text-[#8b949e]">📌 记住我</span>
       </div>
 
       <button
