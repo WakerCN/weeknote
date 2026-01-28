@@ -246,15 +246,6 @@ ${encouragement}
 }
 
 /**
- * 生成进度条
- */
-function generateProgressBar(filled: number, total: number): string {
-  const filledBlocks = Math.min(filled, total);
-  const emptyBlocks = total - filledBlocks;
-  return '🟩'.repeat(filledBlocks) + '⬜'.repeat(emptyBlocks);
-}
-
-/**
  * 根据时间获取问候语
  */
 function getGreeting(): string {
