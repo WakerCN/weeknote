@@ -5,7 +5,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home/index';
-import Auth from './pages/Auth';
+import Auth from './pages/Auth/index';
 import './index.css';
 
 // 路由懒加载：设置页面按需加载，减少首屏体积
