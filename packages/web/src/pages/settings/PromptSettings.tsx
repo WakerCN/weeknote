@@ -12,11 +12,7 @@ import {
   updatePrompt,
   deletePrompt,
   activatePrompt,
-  getFavoritePrompts,
-  publishPrompt,
-  unpublishPrompt,
   copyPrompt,
-  unfavoritePrompt,
   type PromptTemplate,
   type PromptVisibility,
 } from '../../api';
@@ -35,7 +31,6 @@ interface FormSnapshot {
 interface GroupedTemplates {
   system: PromptTemplate[];
   mine: PromptTemplate[];
-  favorites: PromptTemplate[];
 }
 
 export default function PromptSettings() {
@@ -56,17 +51,9 @@ export default function PromptSettings() {
     },
   });
 
-  // 加载收藏模板
-  const { data: favoritesData, refresh: refreshFavorites } = useRequest(getFavoritePrompts, {
-    onError: () => {
-      // 静默处理错误，收藏功能不影响主流程
-    },
-  });
-
   const templates = promptsData?.templates || [];
   const activeTemplateId = promptsData?.activeTemplateId;
   const defaults = promptsData?.defaults;
-  const favoriteTemplates = favoritesData?.templates || [];
 
   // 分组模板
   const groupedTemplates = useMemo<GroupedTemplates>(() => {
@@ -81,22 +68,14 @@ export default function PromptSettings() {
       }
     });
 
-    // 收藏的模板（过滤掉已在"我的模板"中的）
-    const myIds = new Set(mine.map((t) => t.id || t._id));
-    const favorites = favoriteTemplates.filter(
-      (t: PromptTemplate) => !myIds.has(t.id || t._id)
-    );
-
-    return { system, mine, favorites };
-  }, [templates, favoriteTemplates]);
+    return { system, mine };
+  }, [templates]);
 
   // 获取当前选中的模板
   const selectedTemplate = useMemo(() => {
     if (!selectedId) return null;
-    // 在所有模板中查找
-    const allTemplates = [...templates, ...favoriteTemplates];
-    return allTemplates.find((t: PromptTemplate) => (t.id || t._id) === selectedId) || null;
-  }, [selectedId, templates, favoriteTemplates]);
+    return templates.find((t: PromptTemplate) => (t.id || t._id) === selectedId) || null;
+  }, [selectedId, templates]);
 
   // 判断是否可编辑
   const isEditable = useMemo(() => {
@@ -104,18 +83,12 @@ export default function PromptSettings() {
     if (!selectedTemplate) return false;
     // 系统模板不可编辑
     if (selectedTemplate.visibility === 'system') return false;
-    // 收藏的模板（不是自己的）不可编辑
+    // 我的模板可编辑
     const isMyTemplate = groupedTemplates.mine.some(
       (t) => (t.id || t._id) === selectedId
     );
     return isMyTemplate;
   }, [isCreating, selectedTemplate, groupedTemplates.mine, selectedId]);
-
-  // 判断是否是收藏的模板
-  const isFavorited = useMemo(() => {
-    if (!selectedId) return false;
-    return groupedTemplates.favorites.some((t) => (t.id || t._id) === selectedId);
-  }, [selectedId, groupedTemplates.favorites]);
 
   // 选中模板变化时更新编辑内容
   useEffect(() => {
@@ -231,34 +204,6 @@ export default function PromptSettings() {
     }
   );
 
-  // 发布到广场
-  const { loading: publishing, run: handlePublish } = useRequest(
-    async () => {
-      if (!selectedId) return;
-      await publishPrompt(selectedId);
-      await refresh();
-    },
-    {
-      manual: true,
-      onSuccess: () => toast.success('已发布到 Prompt 广场'),
-      onError: (err) => toast.error(err.message || '发布失败'),
-    }
-  );
-
-  // 从广场撤回
-  const { loading: unpublishing, run: handleUnpublish } = useRequest(
-    async () => {
-      if (!selectedId) return;
-      await unpublishPrompt(selectedId);
-      await refresh();
-    },
-    {
-      manual: true,
-      onSuccess: () => toast.success('已从广场撤回'),
-      onError: (err) => toast.error(err.message || '撤回失败'),
-    }
-  );
-
   // 复制为新模板
   const { loading: copying, run: handleCopy } = useRequest(
     async () => {
@@ -274,26 +219,6 @@ export default function PromptSettings() {
       manual: true,
       onSuccess: () => toast.success('已复制为新模板'),
       onError: (err) => toast.error(err.message || '复制失败'),
-    }
-  );
-
-  // 取消收藏
-  const { run: handleUnfavorite } = useRequest(
-    async () => {
-      if (!selectedId) return;
-      await unfavoritePrompt(selectedId);
-      await refreshFavorites();
-      // 切换到其他模板
-      if (groupedTemplates.mine.length > 0) {
-        setSelectedId(groupedTemplates.mine[0].id || groupedTemplates.mine[0]._id);
-      } else if (groupedTemplates.system.length > 0) {
-        setSelectedId(groupedTemplates.system[0].id || groupedTemplates.system[0]._id);
-      }
-    },
-    {
-      manual: true,
-      onSuccess: () => toast.success('已取消收藏'),
-      onError: (err) => toast.error(err.message || '取消收藏失败'),
     }
   );
 
@@ -314,11 +239,10 @@ export default function PromptSettings() {
   if (loading) return <Loading />;
 
   const isActive = selectedId === activeTemplateId;
-  const isPublic = selectedTemplate?.visibility === 'public';
   const isSystem = selectedTemplate?.visibility === 'system';
 
   // 渲染模板列表项
-  const renderTemplateItem = (template: PromptTemplate, showBadge?: 'system' | 'public' | 'favorite') => {
+  const renderTemplateItem = (template: PromptTemplate, showBadge?: 'system') => {
     const id = template.id || template._id;
     const isSelected = !isCreating && selectedId === id;
     const isItemActive = id === activeTemplateId;
@@ -336,8 +260,6 @@ export default function PromptSettings() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 min-w-0">
             {showBadge === 'system' && <span className="text-xs shrink-0">🔒</span>}
-            {showBadge === 'favorite' && <span className="text-xs shrink-0">⭐</span>}
-            {showBadge === 'public' && <span className="text-xs shrink-0">🌐</span>}
             <div className="font-medium text-[#f0f6fc] text-sm truncate">{template.name}</div>
           </div>
           {isItemActive && (
@@ -398,19 +320,7 @@ export default function PromptSettings() {
               <div>
                 <div className="text-xs text-[#8b949e] font-medium mb-2 px-1">📁 我的模板</div>
                 <div className="space-y-2">
-                  {groupedTemplates.mine.map((t) => 
-                    renderTemplateItem(t, t.visibility === 'public' ? 'public' : undefined)
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 收藏的模板分组 */}
-            {groupedTemplates.favorites.length > 0 && (
-              <div>
-                <div className="text-xs text-[#8b949e] font-medium mb-2 px-1">⭐ 收藏的模板</div>
-                <div className="space-y-2">
-                  {groupedTemplates.favorites.map((t) => renderTemplateItem(t, 'favorite'))}
+                  {groupedTemplates.mine.map((t) => renderTemplateItem(t))}
                 </div>
               </div>
             )}
@@ -427,27 +337,17 @@ export default function PromptSettings() {
                 <p className="text-sm text-[#8b949e] mt-1">
                   管理周报生成的提示词模板
                   {isSystem && <span className="ml-2 text-yellow-400">（系统模板，只读）</span>}
-                  {isFavorited && <span className="ml-2 text-yellow-400">（收藏的模板，只读）</span>}
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 {/* 复制为新模板 */}
-                {!isCreating && selectedId && (isSystem || isFavorited) && (
+                {!isCreating && selectedId && isSystem && (
                   <button
                     onClick={handleCopy}
                     disabled={copying}
                     className="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-[#238636] text-white hover:bg-[#2ea043]"
                   >
                     {copying ? '复制中...' : '📋 复制为新模板'}
-                  </button>
-                )}
-                {/* 取消收藏 */}
-                {!isCreating && selectedId && isFavorited && (
-                  <button
-                    onClick={handleUnfavorite}
-                    className="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-[#21262d] text-[#f0f6fc] hover:bg-[#30363d] border border-[#30363d]"
-                  >
-                    取消收藏
                   </button>
                 )}
                 {/* 设为默认 */}
@@ -540,43 +440,6 @@ export default function PromptSettings() {
                 placeholder="输入用户提示词模板..."
               />
             </SettingsCard>
-
-            {/* 发布到广场 - 仅我的模板可见 */}
-            {!isCreating && selectedId && isEditable && (
-              <SettingsCard>
-                <SettingsCardHeader 
-                  title="发布到广场" 
-                  description={isPublic ? '此模板已发布到 Prompt 广场，其他用户可以浏览和收藏' : '将模板发布到 Prompt 广场，与其他用户分享'}
-                />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm text-[#f0f6fc]">
-                      {isPublic ? '🌐 已发布到广场' : '📤 分享你的模板'}
-                    </div>
-                    <div className="text-xs text-[#8b949e] mt-1">
-                      {isPublic ? '点击撤回将模板设为私有' : '发布后其他用户可以浏览和收藏你的模板'}
-                    </div>
-                  </div>
-                  {isPublic ? (
-                    <button
-                      onClick={handleUnpublish}
-                      disabled={unpublishing}
-                      className="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-[#21262d] text-[#f0f6fc] hover:bg-[#30363d] border border-[#30363d]"
-                    >
-                      {unpublishing ? '撤回中...' : '从广场撤回'}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handlePublish}
-                      disabled={publishing}
-                      className="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 bg-[#238636] text-white hover:bg-[#2ea043]"
-                    >
-                      {publishing ? '发布中...' : '🚀 发布到广场'}
-                    </button>
-                  )}
-                </div>
-              </SettingsCard>
-            )}
 
             {/* 危险操作 - 仅我的模板可见 */}
             {!isCreating && selectedId && isEditable && (

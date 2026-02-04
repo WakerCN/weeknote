@@ -15,7 +15,7 @@ const PromptSettings = lazy(() => import('./pages/settings/PromptSettings'));
 const ReminderSettings = lazy(() => import('./pages/settings/ReminderSettings'));
 const AccountSettings = lazy(() => import('./pages/settings/AccountSettings'));
 const DailyLog = lazy(() => import('./pages/DailyLog/index'));
-const PromptPlaza = lazy(() => import('./pages/PromptPlaza/index'));
+const Help = lazy(() => import('./pages/Help/index'));
 
 // 加载中占位组件
 function LoadingFallback() {
@@ -31,14 +31,6 @@ const router = createBrowserRouter([
   {
     path: '/auth',
     element: <Auth />,
-  },
-  {
-    path: '/prompt-plaza',
-    element: (
-      <Suspense fallback={<LoadingFallback />}>
-        <PromptPlaza />
-      </Suspense>
-    ),
   },
   {
     path: '/',
@@ -115,6 +107,26 @@ const router = createBrowserRouter([
         ),
       },
     ],
+  },
+  {
+    path: '/help',
+    element: (
+      <ProtectedRoute>
+        <Suspense fallback={<LoadingFallback />}>
+          <Help />
+        </Suspense>
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/help/:docId',
+    element: (
+      <ProtectedRoute>
+        <Suspense fallback={<LoadingFallback />}>
+          <Help />
+        </Suspense>
+      </ProtectedRoute>
+    ),
   },
 ]);
 

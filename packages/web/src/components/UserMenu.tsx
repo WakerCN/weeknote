@@ -5,7 +5,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { LogOut, User as UserIcon, Sparkles } from 'lucide-react';
+import { LogOut, User as UserIcon } from 'lucide-react';
 
 export default function UserMenu() {
   const { user, logout } = useAuth();
@@ -54,16 +54,6 @@ export default function UserMenu() {
             </div>
             <p className="text-xs text-[#8b949e] truncate">{user.email}</p>
           </div>
-
-          {/* Prompt 广场链接 */}
-          <Link
-            to="/prompt-plaza"
-            onClick={() => setIsOpen(false)}
-            className="w-full px-4 py-2 text-left text-sm text-[#c9d1d9] hover:bg-[#0d1117] flex items-center gap-2 transition-colors"
-          >
-            <Sparkles size={16} className="text-[#58a6ff]" />
-            Prompt 广场
-          </Link>
 
           {/* 退出按钮 */}
           <button
