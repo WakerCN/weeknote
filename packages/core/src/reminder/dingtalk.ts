@@ -229,10 +229,7 @@ ${encouragement}
 
 ## 🚀 快速操作
 
-> 📝 **[立即填写日志](${siteUrl}/daily)**
->
-> 📊 **[生成本周周报](${siteUrl}/report)**
-`.trim();
+> 📝 **[立即填写日志](${siteUrl}/daily)**`.trim();
 
   // 保留按钮作为备选，但主要通过 Markdown 链接操作
   const btns: ActionCardButton[] = [
