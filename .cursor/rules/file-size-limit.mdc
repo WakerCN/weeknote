@@ -1,6 +1,6 @@
 ---
-description: 文件大小指导原则 - 单文件建议不超过300行，适度拆分
-alwaysApply: true
+description: "文件大小和代码拆分指导原则：当文件超过300行或难以维护时，提供渐进式重构建议，包括提取Hooks、拆分子组件、提取工具函数等策略"
+alwaysApply: false
 ---
 
 # 文件大小指导原则
