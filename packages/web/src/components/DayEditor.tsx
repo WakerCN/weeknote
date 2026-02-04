@@ -93,7 +93,7 @@ function EditorSection({
       >
         <div className="overflow-hidden flex flex-col min-h-0">
           {hasExpanded && (
-            <div className="p-3 flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col min-h-0">
               <MilkdownEditor
                 key={editorKey}
                 defaultValue={value}

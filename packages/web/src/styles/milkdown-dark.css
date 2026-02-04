@@ -20,6 +20,7 @@
 
 .milkdown-editor-container .milkdown .ProseMirror {
   flex: 1;
+  padding: 20px 90px;
 }
 
 /* 斜杠菜单样式 - 确保高 z-index 和正确显示 */
