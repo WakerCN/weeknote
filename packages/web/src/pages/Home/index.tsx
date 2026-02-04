@@ -7,7 +7,7 @@ import { Combobox, type ComboboxOption, type ComboboxTag } from '@/components/ui
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useAppStore } from '@/stores';
 import { useRequest } from 'ahooks';
-import { Calendar, ChevronDown, ChevronUp, FileText, Sparkles, StopCircle } from 'lucide-react';
+import { BookOpen, Calendar, ChevronDown, ChevronUp, FileText, StopCircle } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -414,20 +414,20 @@ export default function Home() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-[#8b949e]">AI 周报生成器</span>
           <button
-            onClick={() => navigate('/prompt-plaza', { scope: 'root' })}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors"
-            title="Prompt 广场"
-          >
-            <Sparkles className="w-4 h-4" />
-            Prompt 广场
-          </button>
-          <button
             onClick={() => navigate('/daily', { scope: 'root' })}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors"
             title="每日记录"
           >
             <Calendar className="w-4 h-4" />
             每日记录
+          </button>
+          <button
+            onClick={() => navigate('/help', { scope: 'root' })}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-[#8b949e] hover:text-[#f0f6fc] hover:bg-[#21262d] transition-colors"
+            title="帮助中心"
+          >
+            <BookOpen className="w-4 h-4" />
+            帮助
           </button>
           <button
             onClick={() => navigate('/settings', { scope: 'root' })}
